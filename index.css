@@ -1,0 +1,246 @@
+* {
+	box-sizing: border-box;
+}
+
+:root {
+	font-family: sans-serif;
+	--size: 78vmin;
+	--rock: url('./assets/webgoat/rock.svg') center / contain no-repeat;
+	--paper: url('./assets/webgoat/paper.svg') center / contain no-repeat;
+	--scissors: url('./assets/webgoat/scissors.svg') center / contain no-repeat;
+	--stick: url('./assets/stick.svg');
+	--quad-out: cubic-bezier(0.333, 0.667, 0.667, 1);
+}
+:root[theme=latte] {
+	background-color: #eff1f5;
+	color: #4c4f69;
+	--crust: #dce0e8;
+	--wall: #7c7f93;
+	--soft: #6c6f85;
+	--red: #e64553;
+	--crust-red: #ffd4d2;
+	--blue: #209fb5;
+	--crust-blue: #cce6ec;
+	--previous: #decbcb;
+	--previous-red: #f7c1bb;
+	--previous-blue: #d4cfce;
+}
+:root[theme=mocha] {
+	background-color: #1e1e2e;
+	color: #cdd6f4;
+	--crust: #11111b;
+	--wall: #1e1e2e;
+	--soft: #a6adc8;
+	--red: #eba0ac;
+	--crust-red: #30171e;
+	--blue: #74c7ec;
+	--crust-blue: #10232b;
+	--previous: #2b2932;
+	--previous-red: #492f35;
+	--previous-blue: #2c3a41;
+}
+h1 {
+	text-align: center;
+}
+
+body, .board-outer {
+	display: flex;
+	position: relative;
+	padding: 0.5em;
+	justify-content: center;
+	align-items: center;
+}
+body {
+	flex-direction: column;
+	margin: 0;
+}
+.board-outer {
+	flex: 0 1 var(--size);
+	padding: 0.5em;
+}
+#board {
+	display: grid;
+	grid-template-columns: repeat(9, 1fr);
+	padding: 2px;
+	gap: 2px;
+	aspect-ratio: 1;
+	flex: none;
+	background-color: var(--wall);
+	user-select: none;
+}
+.cell {
+	position: relative;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background-color: var(--crust);
+}
+.cell#I9 {
+	background-color: var(--crust-red);
+}
+.cell#A1 {
+	background-color: var(--crust-blue);
+}
+.cell.previous {
+	background-color: var(--previous);
+}
+.cell#I9.previous {
+	background-color: var(--previous-red);
+}
+.cell#A1.previous {
+	background-color: var(--previous-blue);
+}
+
+.arrows-outer {
+	position: absolute;
+	aspect-ratio: 1;
+	pointer-events: none;
+	padding: 0.5em;
+	flex: none;
+}
+#arrows {
+	/* Each cell could be thought of as reaching 1px further on every side. */
+	opacity: 60%;
+	width: 100%;
+	height: 100%;
+}
+
+.coord {
+	position: absolute;
+	text-box: cap alphabetic;
+	color: var(--soft);
+	font: small serif;
+}
+.coord.column {
+	left: 0.4em;
+	bottom: 0.4em;
+}
+.coord.row {
+	text-align: right;
+	right: 0.4em;
+	top: 0.4em;
+}
+.stick {
+	position: absolute;
+	width: 1.5em;
+	height: 1.5em;
+	background-image: var(--stick);
+	z-index: 5;
+}
+.blue.stick {
+	top: 0;
+	right: 0;
+}
+.red.stick {
+	bottom: 0;
+	left: 0;
+}
+
+.red.piece {
+	background-color: var(--red);
+}
+.blue.piece {
+	background-color: var(--blue);
+}
+.rock.piece {
+	-webkit-mask: var(--rock);
+	mask: var(--rock);
+}
+.paper.piece {
+	-webkit-mask: var(--paper);
+	mask: var(--paper);
+}
+.scissors.piece {
+	-webkit-mask: var(--scissors);
+	mask: var(--scissors);
+}
+.piece {
+	position: relative;
+	width: 100%;
+	height: 100%;
+	cursor: grab;
+	transition: width 0.25s var(--quad-out), height 0.25s var(--quad-out);
+}
+.piece[active=active] {
+	z-index: 10;
+	cursor: grabbing;
+	transition: none;
+}
+
+.analysis-outer {
+	display: flex;
+	flex-direction: column;
+	padding: 0.5em;
+}
+.analysis {
+	display: flex;
+	background-color: var(--wall);
+	padding: 1px;
+}
+.moves {
+	background-color: var(--crust);
+	flex: 1 1 auto;
+	overflow-y: auto;
+	margin: 1px;
+}
+
+.sidebar-outer {
+	padding: 0.5em;
+	flex: none;
+	flex-direction: row;
+}
+.sidebar {
+	display: grid;
+	background-color: var(--wall);
+	padding: 2px;
+	gap: 2px;
+}
+.bar-item {
+	background-color: var(--crust);
+}
+.icon {
+	width: 3em;
+	height: 3em;
+	background-color: var(--soft);
+}
+.icon:hover, .icon[active=active] {
+	background-color: currentColor;
+}
+.icon#settings {
+	-webkit-mask: url('./assets/gear.svg');
+	mask: url('./assets/gear.svg');
+	transition: rotate 0.25s linear;
+}
+.icon#settings[active=active] {
+	rotate: 90deg;
+}
+
+@media (width > 100vh) {
+	body {
+		flex-direction: row;
+		height: 100vh;
+	}
+	.board-outer, .analysis-outer, .sidebar-outer {
+		height: var(--size);
+	}
+	.sidebar-outer {
+		flex-direction: column;
+	}
+	.analysis-outer {
+		flex: 0 2 40ch;
+	}
+	#board, .arrows-outer {
+		width: 100%;
+	}
+	.analysis {
+		height: 100%;
+	}
+}
+@media (width <= 100vh) {
+	#board, .arrows-outer {
+		height: 100%;
+	}
+	.analysis-outer, .sidebar-outer {
+		width: var(--size);
+	}
+}
