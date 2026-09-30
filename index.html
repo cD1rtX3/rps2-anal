@@ -34,6 +34,9 @@
 				<div class="bar-item"><div class="icon" id="settings"></div></div>
 			</div>
 		</div>
+		<div class="analysis-outer">
+			<div class="analysis"><div class="moves"></div></div>
+		</div>
 		<div class="board-outer">
 			<div id="board">
 				<div class="cell" id="A9"></div>
@@ -128,18 +131,38 @@
 				</div>
 			</div>
 			<div class="arrows-outer">
-				<div style="padding: 1px;">
-					<svg id="arrows" viewBox="-0.5 -0.5 9 9"><!--
-						<circle cx="0" cy="0" r="0.46875" fill="none" stroke="#f5e0dc" stroke-width="0.0625" />
-						<circle cx="0" cy="8" r="0.46875" fill="none" stroke="#f5e0dc" stroke-width="0.0625" />
-						<circle cx="8" cy="0" r="0.46875" fill="none" stroke="#f5e0dc" stroke-width="0.0625" />
-						<circle cx="8" cy="8" r="0.46875" fill="none" stroke="#f5e0dc" stroke-width="0.0625" />
-					--></svg>
+				<div class="arrows-shell">
+					<svg id="arrows" viewBox="-0.5 -0.5 9 9">
+						<defs>
+							<marker id="arrowhead-0" orient="auto" markerWidth="4" marker-height="4" refX="2.05" refY="2" overflow="visible">
+								<path d="M 0 0 v 4 l 3 -2 Z" fill="var(--arrow-0)" />
+							</marker>
+							<marker id="arrowhead-1" orient="auto" markerWidth="4" marker-height="4" refX="2.05" refY="2" overflow="visible">
+								<path d="M 0 0 v 4 l 3 -2 Z" fill="var(--arrow-1)" />
+							</marker>
+							<marker id="arrowhead-2" orient="auto" markerWidth="4" marker-height="4" refX="2.05" refY="2" overflow="visible">
+								<path d="M 0 0 v 4 l 3 -2 Z" fill="var(--arrow-2)" />
+							</marker>
+							<marker id="arrowhead-3" orient="auto" markerWidth="4" marker-height="4" refX="2.05" refY="2" overflow="visible">
+								<path d="M 0 0 v 4 l 3 -2 Z" fill="var(--arrow-3)" />
+							</marker>
+							<marker id="arrowhead-4" orient="auto" markerWidth="4" marker-height="4" refX="2.05" refY="2" overflow="visible">
+								<path d="M 0 0 v 4 l 3 -2 Z" fill="var(--arrow-4)" />
+							</marker>
+							<marker id="arrowhead-5" orient="auto" markerWidth="4" marker-height="4" refX="2.05" refY="2" overflow="visible">
+								<path d="M 0 0 v 4 l 3 -2 Z" fill="var(--arrow-5)" />
+							</marker>
+							<marker id="arrowhead-6" orient="auto" markerWidth="4" marker-height="4" refX="2.05" refY="2" overflow="visible">
+								<path d="M 0 0 v 4 l 3 -2 Z" fill="var(--arrow-6)" />
+							</marker>
+							<marker id="arrowhead-7" orient="auto" markerWidth="4" marker-height="4" refX="2.05" refY="2" overflow="visible">
+								<path d="M 0 0 v 4 l 3 -2 Z" fill="var(--arrow-7)" />
+							</marker>
+						</defs>
+						<g id="arrows-inner" />
+					</svg>
 				</div>
 			</div>
-		</div>
-		<div class="analysis-outer">
-			<div class="analysis"><div class="moves"></div></div>
 		</div>
 		<script src="./index.js"></script>
 	</body>

@@ -24,6 +24,14 @@
 	--previous: #decbcb;
 	--previous-red: #f7c1bb;
 	--previous-blue: #d4cfce;
+	--arrow-0: #dc8a78;
+	--arrow-1: #d20f39;
+	--arrow-2: #40a02b;
+	--arrow-3: #df8e1d;
+	--arrow-4: #1e66f5;
+	--arrow-5: #8839ef;
+	--arrow-6: #179299;
+	--arrow-7: #7c7f93;
 }
 :root[theme=mocha] {
 	background-color: #1e1e2e;
@@ -38,6 +46,14 @@
 	--previous: #2b2932;
 	--previous-red: #492f35;
 	--previous-blue: #2c3a41;
+	--arrow-0: #f5e0dc;
+	--arrow-1: #f38ba8;
+	--arrow-2: #a6e3a1;
+	--arrow-3: #f9e2af;
+	--arrow-4: #89b4fa;
+	--arrow-5: #cba6f7;
+	--arrow-6: #94e2d5;
+	--arrow-7: #9399b2;
 }
 h1 {
 	text-align: center;
@@ -98,11 +114,19 @@ body {
 	padding: 0.5em;
 	flex: none;
 }
+.arrows-shell {
+	display: flex;
+	align-items: center;
+	width: 100%;
+	height: 100%;
+	padding: 1px;
+}
 #arrows {
 	/* Each cell could be thought of as reaching 1px further on every side. */
 	opacity: 60%;
 	width: 100%;
 	height: 100%;
+	overflow: visible;
 }
 
 .coord {

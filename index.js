@@ -1,5 +1,10 @@
 'use strict';
 
+document.getElementById('board').addEventListener(
+	'contextmenu',
+	(e) => e.preventDefault()
+);
+
 const ROCK = 1;
 const PAPER = 2;
 const SCISSORS = 3;
@@ -77,7 +82,8 @@ const setUpBoard = () => {
 		for (let x = 0; x < 9; x++) {
 			const piece = position[y][x];
 			const cell_name = getSquareName(x, y);
-			board_html += `<div class="cell" id="${cell_name}">${
+			board_html
+				+= `<div class="cell" id="${cell_name}">${
 					piece !== 0 ? `<span class="${piece_strings[piece]} piece"></span>` : ''
 				}${
 					x === 8 ? `<span class="row coord">${cell_name[1]}</span>` : ''
@@ -93,6 +99,9 @@ const setUpBoard = () => {
 	board_element.innerHTML = board_html;
 	Array.prototype.forEach.call(document.getElementsByClassName('piece'), (el) => {
 		el.addEventListener('mousedown', (e) => {
+			if (e.button !== 0) {
+				return false;
+			}
 			if (typeof(drag_bounce_timeout) !== 'undefined') {
 				clearTimeout(drag_bounce_timeout);
 			}
@@ -102,6 +111,7 @@ const setUpBoard = () => {
 			active_piece = el;
 			return dragPiece(e);
 		});
+		el.addEventListener('contextmenu', (e) => e.preventDefault());
 	});
 	giveTalkingStick();
 };
@@ -124,7 +134,7 @@ const movePiece = (piece_x, piece_y, target_x, target_y) => {
 	if (target_piece && (target_piece & 4) == (piece & 4)) {
 		return false;
 	}
-	// it's like we in some king of intransitive capture system
+	// it's like we're in some king of intransitive capture system
 	switch (target_piece & 3) {
 		case ROCK:
 			if ((piece & 3) !== PAPER) {
@@ -216,7 +226,12 @@ const dragPiece = (e) => {
 		return false;
 	}
 	const rect = active_piece.parentElement.getBoundingClientRect();
-	active_piece.style.cssText = `left: ${e.pageX - rect.x - 0.5 * rect.width}px; top: ${e.pageY - rect.y - 0.5 * rect.height}px;`;
+	active_piece.style.cssText
+		= `left: ${
+			e.pageX - rect.x - 0.5 * rect.width
+		}px; top: ${
+			e.pageY - rect.y - 0.5 * rect.height
+		}px;`;
 };
 document.addEventListener('mousemove', dragPiece);
 
@@ -230,4 +245,117 @@ Array.prototype.forEach.call(document.getElementsByClassName('icon'), (el) => {
 			el.removeAttribute('active');
 		}
 	});
+});
+
+const arrowCircle = (x, y, color, is_ghost) => '<circle'
+		+ ` id="${is_ghost ? 'ghost' : `arr${x}${y}${x}${y}`}"`
+		+ (is_ghost ? 'opacity="0.707"' : '')
+		+ ` cx="${x}" cy="${y}"`
+		+ ' r="0.46875"'
+		+ ' fill="none"'
+		+ ` stroke="var(--arrow-${color})"`
+		+ ' stroke-width="0.0625" />';
+const arrowPoint = (px, py, tx, ty, color, is_ghost) => {
+	// We have to manually subtract the stroke width from the length.
+	const w = tx - px, h = ty - py;
+	const norm = 0.15625 / Math.hypot(w, h);
+	return '<line'
+		+ ` id="${is_ghost ? 'ghost' : `arr${px}${py}${tx}${ty}`}"`
+		+ (is_ghost ? 'opacity="0.707"' : '')
+		+ ` x1="${px}" y1="${py}"`
+		+ ` x2="${tx - w * norm}" y2="${ty - h * norm}"`
+		+ ` stroke="var(--arrow-${color})"`
+		+ ' stroke-width="0.15625"'
+		+ ' stroke-linecap="round"'
+		+ ` marker-end="url(#arrowhead-${color})" />`;
+};
+
+const arrow_element = document.getElementById('arrows-inner');
+const drawn_arrows = new Map();
+const drawArrow = (px, py, tx, ty, color) => {
+	if (tx < 0 || tx > 8 || ty < 0 || ty > 8) {
+		return;
+	}
+	const arrow_id = `arr${px}${py}${tx}${ty}`;
+	const entry = drawn_arrows.get(arrow_id);
+	if (typeof(entry) !== 'undefined') {
+		document.getElementById(arrow_id).remove();
+		if (entry === color) {
+			drawn_arrows.delete(arrow_id);
+			return;
+		}
+	}
+	drawn_arrows.set(arrow_id, color);
+	arrow_element.innerHTML += px === tx && py === ty
+			? arrowCircle(px, py, color, false)
+			: arrowPoint(px, py, tx, ty, color, false);
+};
+
+let ghost = JSON.parse('{"present": false}');
+const drawGhost = () => {
+	const arrow_id = `arr${ghost.px}${ghost.py}${ghost.tx}${ghost.ty}`;
+	const entry = drawn_arrows.get(arrow_id);
+	if (typeof(entry) !== 'undefined') {
+		document.getElementById(arrow_id).setAttribute(
+			'opacity',
+			entry === ghost.color ? '0.293' : '0'
+		);
+		if (entry === ghost.color) {
+			return;
+		}
+	}
+	arrow_element.innerHTML += ghost.px === ghost.tx && ghost.py === ghost.ty
+			? arrowCircle(ghost.px, ghost.py, ghost.color, true)
+			: arrowPoint(ghost.px, ghost.py, ghost.tx, ghost.ty, ghost.color, true);
+};
+const eraseGhost = () => {
+	if (!ghost.present) {
+		return;
+	}
+	const arrow_id = `arr${ghost.px}${ghost.py}${ghost.tx}${ghost.ty}`;
+	const entry = drawn_arrows.get(arrow_id);
+	if (typeof(entry) !== 'undefined') {
+		document.getElementById(arrow_id).removeAttribute('opacity');
+		if (entry === ghost.color) {
+			return;
+		}
+	}
+	document.getElementById('ghost').remove();
+};
+board_element.addEventListener('mousedown', (e) => {
+	if (e.button !== 2) {
+		drawn_arrows.clear();
+		arrow_element.innerHTML = '';
+		return false;
+	}
+	({x: ghost.px, y: ghost.py} = getMousedCell(e));
+	ghost.py = 8 - ghost.py;
+	ghost.tx = ghost.px;
+	ghost.ty = ghost.py;
+	ghost.color = 1 * Number(e.shiftKey) | 2 * Number(e.ctrlKey) | 4 * Number(e.altKey);
+	drawGhost();
+	ghost.present = true;
+	return true;
+});
+document.addEventListener('mousemove', (e) => {
+	if (!ghost.present) {
+		return false;
+	}
+	const {x, y} = getMousedCell(e);
+	if (ghost.tx === x && ghost.ty === y) {
+		return true;
+	}
+	eraseGhost();
+	ghost.tx = x;
+	ghost.ty = 8 - y;
+	drawGhost();
+	return true;
+});
+document.addEventListener('mouseup', (e) => {
+	if (e.button !== 2 || !ghost.present) {
+		return false;
+	}
+	eraseGhost();
+	ghost.present = false;
+	drawArrow(ghost.px, ghost.py, ghost.tx, ghost.ty, ghost.color);
 });
