@@ -18,7 +18,7 @@ const getNamedSquare = (name) => ({
 	y: name.codePointAt(1) - 49,
 });
 
-const getStartpos = () => JSON.parse(`[
+const startpos = JSON.parse(`[
 	[0, 0, 0, 0, 0, 0, 0, 0, 0],
 	[0, 0, 0, 1, 2, 0, 0, 0, 0],
 	[0, 0, 1, 2, 3, 0, 0, 0, 0],
@@ -29,7 +29,7 @@ const getStartpos = () => JSON.parse(`[
 	[0, 0, 0, 0, 6, 5, 0, 0, 0],
 	[0, 0, 0, 0, 0, 0, 0, 0, 0]
 ]`);
-let board = getStartpos();
+let board = [...startpos];
 let red_to_move = false;
 let current_fullmove = 1;
 let starting_fullmove = 1;
@@ -352,8 +352,8 @@ const dragPiece = (e) => {
 		return false;
 	}
 	const rect = active_piece.parentElement.getBoundingClientRect();
-	active_piece.style.cssText = `left: ${e.pageX - rect.x - 0.5 * rect.width}px;`
-			+ ` top: ${e.pageY - rect.y - 0.5 * rect.height}px;`;
+	active_piece.style.cssText = `left: ${e.x - rect.x - 0.5 * rect.width}px;`
+			+ ` top: ${e.y - rect.y - 0.5 * rect.height}px;`;
 };
 document.addEventListener('mousemove', dragPiece);
 

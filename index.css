@@ -291,7 +291,7 @@ body {
 }
 
 /* Landscape mode. There needs to be enough space. */
-@media (width > 100vh) and (width > 45em) {
+@media (width >= 100vh) and (width >= 51em) {
 	html {
 		--size: 78vh;
 		/* more subpixel alignment garbage */
@@ -318,7 +318,7 @@ body {
 		height: 100%;
 	}
 }
-@media not ((width > 100vh) and (width > 45em)) {
+@media not ((width >= 100vh) and (width >= 51em)) {
 	html {
 		--size: 78vw;
 		--size: round(78vw, 1px);
