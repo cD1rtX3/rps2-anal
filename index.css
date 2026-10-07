@@ -203,13 +203,21 @@ body {
 	background-color: var(--wall);
 	padding: 1px;
 }
+.moves-outer {
+	display: flex;
+	flex-direction: column-reverse;
+	margin: 1px;
+	overflow-y: auto;
+	scrollbar-color: var(--surface-2) transparent;
+	background-color: var(--crust);
+	flex: 1 1 auto;
+	max-height: var(--size);
+}
 #moves {
 	display: grid;
 	font-size: 1.33em;
-	background-color: var(--crust);
+	font-size: round(1.33em, 1px);
 	flex: 1 1 auto;
-	overflow-y: auto;
-	margin: 1px;
 	grid-template-columns: auto 1fr 1fr;
 	grid-auto-rows: 2em;
 	gap: 2px;
@@ -286,6 +294,8 @@ body {
 @media (width > 100vh) and (width > 45em) {
 	html {
 		--size: 78vh;
+		/* more subpixel alignment garbage */
+		--size: round(78vh, 1px);
 	}
 	body {
 		flex-direction: row;
@@ -311,6 +321,7 @@ body {
 @media not ((width > 100vh) and (width > 45em)) {
 	html {
 		--size: 78vw;
+		--size: round(78vw, 1px);
 	}
 	#board, .arrows-outer {
 		height: 100%;
