@@ -116,6 +116,6 @@
 <path d="M1654 1175 c-26 -39 -12 -72 37 -87 41 -12 42 -11 70 20 36 40 37 69
 3 82 -47 18 -92 12 -110 -15z"/>
 </g>
-<rect x="875" y="0" width="125" height="500" class="red"/>
-<rect x="875" y="500" width="125" height="500" class="blue"/>
+<rect x="875" y="0" width="125" height="450" class="red"/>
+<rect x="875" y="450" width="125" height="550" class="blue"/>
 </svg>
