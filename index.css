@@ -61,16 +61,20 @@
 	--surface-0: #313244;
 }
 
-body, .board-outer {
+body {
+	margin: 0;
+}
+#outer, .board-outer {
 	display: flex;
 	position: relative;
 	padding: 0.5em;
 	justify-content: center;
 	align-items: center;
 }
-body {
+#outer {
 	flex-direction: column;
-	margin: 0;
+	width: 100%;
+	height: 100%;
 }
 .board-outer {
 	flex: 0 1 var(--size);
@@ -297,7 +301,7 @@ body {
 		/* more subpixel alignment garbage */
 		--size: round(78vh, 1px);
 	}
-	body {
+	#outer {
 		flex-direction: row;
 		height: 100vh;
 	}

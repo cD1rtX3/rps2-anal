@@ -34,207 +34,213 @@
 		<link rel="stylesheet" href="./index.css">
 	</head>
 	<body>
-		<div class="sidebar-outer">
-			<div class="sidebar">
-				<div class="bar-item"><div class="icon" id="settings"></div></div>
+		<noscript>
+			<h1>This page requires JavaScript be enabled to function.</h1>
+		</noscript>
+		<div id="outer" style="display: none;">
+			<div class="sidebar-outer">
+				<div class="sidebar">
+					<div class="bar-item"><div class="icon" id="settings"></div></div>
+				</div>
+			</div>
+			<div class="board-outer">
+				<div id="board">
+					<div class="cell" id="A9"></div>
+					<div class="cell" id="B9"></div>
+					<div class="cell" id="C9"></div>
+					<div class="cell" id="D9"></div>
+					<div class="cell" id="E9"></div>
+					<div class="cell" id="F9"></div>
+					<div class="cell" id="G9"></div>
+					<div class="cell" id="H9"></div>
+					<div class="cell" id="I9">
+						<span class="row coord">9</span>
+						<span class="red stick" title="Talking Stick" style="display: none;"></span>
+					</div>
+					<div class="cell" id="A8"></div>
+					<div class="cell" id="B8"></div>
+					<div class="cell" id="C8"></div>
+					<div class="cell" id="D8"></div>
+					<div class="cell" id="E8"><span class="red paper piece"></span></div>
+					<div class="cell" id="F8"><span class="red rock piece"></span></div>
+					<div class="cell" id="G8"></div>
+					<div class="cell" id="H8"></div>
+					<div class="cell" id="I8"><span class="row coord">8</span></div>
+					<div class="cell" id="A7"></div>
+					<div class="cell" id="B7"></div>
+					<div class="cell" id="C7"></div>
+					<div class="cell" id="D7"></div>
+					<div class="cell" id="E7"><span class="red scissors piece"></span></div>
+					<div class="cell" id="F7"><span class="red paper piece"></span></div>
+					<div class="cell" id="G7"><span class="red rock piece"></span></div>
+					<div class="cell" id="H7"></div>
+					<div class="cell" id="I7"><span class="row coord">7</span></div>
+					<div class="cell" id="A6"></div>
+					<div class="cell" id="B6"></div>
+					<div class="cell" id="C6"></div>
+					<div class="cell" id="D6"></div>
+					<div class="cell" id="E6"></div>
+					<div class="cell" id="F6"><span class="red scissors piece"></span></div>
+					<div class="cell" id="G6"><span class="red paper piece"></span></div>
+					<div class="cell" id="H6"><span class="red rock piece"></span></div>
+					<div class="cell" id="I6"><span class="row coord">6</span></div>
+					<div class="cell" id="A5"></div>
+					<div class="cell" id="B5"><span class="blue paper piece"></span></div>
+					<div class="cell" id="C5"><span class="blue scissors piece"></span></div>
+					<div class="cell" id="D5"></div>
+					<div class="cell" id="E5"></div>
+					<div class="cell" id="F5"></div>
+					<div class="cell" id="G5"><span class="red scissors piece"></span></div>
+					<div class="cell" id="H5"><span class="red paper piece"></span></div>
+					<div class="cell" id="I5"><span class="row coord">5</span></div>
+					<div class="cell" id="A4"></div>
+					<div class="cell" id="B4"><span class="blue rock piece"></span></div>
+					<div class="cell" id="C4"><span class="blue paper piece"></span></div>
+					<div class="cell" id="D4"><span class="blue scissors piece"></span></div>
+					<div class="cell" id="E4"></div>
+					<div class="cell" id="F4"></div>
+					<div class="cell" id="G4"></div>
+					<div class="cell" id="H4"></div>
+					<div class="cell" id="I4"><span class="row coord">4</span></div>
+					<div class="cell" id="A3"></div>
+					<div class="cell" id="B3"></div>
+					<div class="cell" id="C3"><span class="blue rock piece"></span></div>
+					<div class="cell" id="D3"><span class="blue paper piece"></span></div>
+					<div class="cell" id="E3"><span class="blue scissors piece"></span></div>
+					<div class="cell" id="F3"></div>
+					<div class="cell" id="G3"></div>
+					<div class="cell" id="H3"></div>
+					<div class="cell" id="I3"><span class="row coord">3</span></div>
+					<div class="cell" id="A2"></div>
+					<div class="cell" id="B2"></div>
+					<div class="cell" id="C2"></div>
+					<div class="cell" id="D2"><span class="blue rock piece"></span></div>
+					<div class="cell" id="E2"><span class="blue paper piece"></span></div>
+					<div class="cell" id="F2"></div>
+					<div class="cell" id="G2"></div>
+					<div class="cell" id="H2"></div>
+					<div class="cell" id="I2"><span class="row coord">2</span></div>
+					<div class="cell" id="A1">
+						<span class="column coord">A</span>
+						<span class="blue stick" title="Talking Stick"></span>
+					</div>
+					<div class="cell" id="B1"><span class="column coord">B</span></div>
+					<div class="cell" id="C1"><span class="column coord">C</span></div>
+					<div class="cell" id="D1"><span class="column coord">D</span></div>
+					<div class="cell" id="E1"><span class="column coord">E</span></div>
+					<div class="cell" id="F1"><span class="column coord">F</span></div>
+					<div class="cell" id="G1"><span class="column coord">G</span></div>
+					<div class="cell" id="H1"><span class="column coord">H</span></div>
+					<div class="cell" id="I1">
+						<span class="row coord">1</span>
+						<span class="column coord">I</span>
+					</div>
+				</div>
+				<div class="arrows-outer">
+					<div class="arrows-shell">
+						<svg id="arrows" viewBox="-0.5 -0.5 9 9">
+							<defs>
+								<marker
+									id="arrowhead-0"
+									orient="auto"
+									markerWidth="4"
+									marker-height="4"
+									refX="2.05"
+									refY="2"
+									overflow="visible"
+								>
+									<path d="M 0 0 v 4 l 3 -2 Z" fill="var(--arrow-0)" />
+								</marker>
+								<marker
+									id="arrowhead-1"
+									orient="auto"
+									markerWidth="4"
+									marker-height="4"
+									refX="2.05"
+									refY="2"
+									overflow="visible"
+								>
+									<path d="M 0 0 v 4 l 3 -2 Z" fill="var(--arrow-1)" />
+								</marker>
+								<marker
+									id="arrowhead-2"
+									orient="auto"
+									markerWidth="4"
+									marker-height="4"
+									refX="2.05"
+									refY="2"
+									overflow="visible"
+								>
+									<path d="M 0 0 v 4 l 3 -2 Z" fill="var(--arrow-2)" />
+								</marker>
+								<marker
+									id="arrowhead-3"
+									orient="auto"
+									markerWidth="4"
+									marker-height="4"
+									refX="2.05"
+									refY="2"
+									overflow="visible"
+								>
+									<path d="M 0 0 v 4 l 3 -2 Z" fill="var(--arrow-3)" />
+								</marker>
+								<marker
+									id="arrowhead-4"
+									orient="auto"
+									markerWidth="4"
+									marker-height="4"
+									refX="2.05"
+									refY="2"
+									overflow="visible"
+								>
+									<path d="M 0 0 v 4 l 3 -2 Z" fill="var(--arrow-4)" />
+								</marker>
+								<marker
+									id="arrowhead-5"
+									orient="auto"
+									markerWidth="4"
+									marker-height="4"
+									refX="2.05"
+									refY="2"
+									overflow="visible"
+								>
+									<path d="M 0 0 v 4 l 3 -2 Z" fill="var(--arrow-5)" />
+								</marker>
+								<marker
+									id="arrowhead-6"
+									orient="auto"
+									markerWidth="4"
+									marker-height="4"
+									refX="2.05"
+									refY="2"
+									overflow="visible"
+								>
+									<path d="M 0 0 v 4 l 3 -2 Z" fill="var(--arrow-6)" />
+								</marker>
+								<marker
+									id="arrowhead-7"
+									orient="auto"
+									markerWidth="4"
+									marker-height="4"
+									refX="2.05"
+									refY="2"
+									overflow="visible"
+								>
+									<path d="M 0 0 v 4 l 3 -2 Z" fill="var(--arrow-7)" />
+								</marker>
+							</defs>
+							<g id="arrows-inner" />
+						</svg>
+					</div>
+				</div>
+			</div>
+			<div class="analysis-outer">
+				<div class="analysis">
+					<div class="moves-outer"><div id="moves"></div></div>
+				</div>
 			</div>
 		</div>
-		<div class="board-outer">
-			<div id="board">
-				<div class="cell" id="A9"></div>
-				<div class="cell" id="B9"></div>
-				<div class="cell" id="C9"></div>
-				<div class="cell" id="D9"></div>
-				<div class="cell" id="E9"></div>
-				<div class="cell" id="F9"></div>
-				<div class="cell" id="G9"></div>
-				<div class="cell" id="H9"></div>
-				<div class="cell" id="I9">
-					<span class="row coord">9</span>
-					<span class="red stick" title="Talking Stick" style="display: none;"></span>
-				</div>
-				<div class="cell" id="A8"></div>
-				<div class="cell" id="B8"></div>
-				<div class="cell" id="C8"></div>
-				<div class="cell" id="D8"></div>
-				<div class="cell" id="E8"><span class="red paper piece"></span></div>
-				<div class="cell" id="F8"><span class="red rock piece"></span></div>
-				<div class="cell" id="G8"></div>
-				<div class="cell" id="H8"></div>
-				<div class="cell" id="I8"><span class="row coord">8</span></div>
-				<div class="cell" id="A7"></div>
-				<div class="cell" id="B7"></div>
-				<div class="cell" id="C7"></div>
-				<div class="cell" id="D7"></div>
-				<div class="cell" id="E7"><span class="red scissors piece"></span></div>
-				<div class="cell" id="F7"><span class="red paper piece"></span></div>
-				<div class="cell" id="G7"><span class="red rock piece"></span></div>
-				<div class="cell" id="H7"></div>
-				<div class="cell" id="I7"><span class="row coord">7</span></div>
-				<div class="cell" id="A6"></div>
-				<div class="cell" id="B6"></div>
-				<div class="cell" id="C6"></div>
-				<div class="cell" id="D6"></div>
-				<div class="cell" id="E6"></div>
-				<div class="cell" id="F6"><span class="red scissors piece"></span></div>
-				<div class="cell" id="G6"><span class="red paper piece"></span></div>
-				<div class="cell" id="H6"><span class="red rock piece"></span></div>
-				<div class="cell" id="I6"><span class="row coord">6</span></div>
-				<div class="cell" id="A5"></div>
-				<div class="cell" id="B5"><span class="blue paper piece"></span></div>
-				<div class="cell" id="C5"><span class="blue scissors piece"></span></div>
-				<div class="cell" id="D5"></div>
-				<div class="cell" id="E5"></div>
-				<div class="cell" id="F5"></div>
-				<div class="cell" id="G5"><span class="red scissors piece"></span></div>
-				<div class="cell" id="H5"><span class="red paper piece"></span></div>
-				<div class="cell" id="I5"><span class="row coord">5</span></div>
-				<div class="cell" id="A4"></div>
-				<div class="cell" id="B4"><span class="blue rock piece"></span></div>
-				<div class="cell" id="C4"><span class="blue paper piece"></span></div>
-				<div class="cell" id="D4"><span class="blue scissors piece"></span></div>
-				<div class="cell" id="E4"></div>
-				<div class="cell" id="F4"></div>
-				<div class="cell" id="G4"></div>
-				<div class="cell" id="H4"></div>
-				<div class="cell" id="I4"><span class="row coord">4</span></div>
-				<div class="cell" id="A3"></div>
-				<div class="cell" id="B3"></div>
-				<div class="cell" id="C3"><span class="blue rock piece"></span></div>
-				<div class="cell" id="D3"><span class="blue paper piece"></span></div>
-				<div class="cell" id="E3"><span class="blue scissors piece"></span></div>
-				<div class="cell" id="F3"></div>
-				<div class="cell" id="G3"></div>
-				<div class="cell" id="H3"></div>
-				<div class="cell" id="I3"><span class="row coord">3</span></div>
-				<div class="cell" id="A2"></div>
-				<div class="cell" id="B2"></div>
-				<div class="cell" id="C2"></div>
-				<div class="cell" id="D2"><span class="blue rock piece"></span></div>
-				<div class="cell" id="E2"><span class="blue paper piece"></span></div>
-				<div class="cell" id="F2"></div>
-				<div class="cell" id="G2"></div>
-				<div class="cell" id="H2"></div>
-				<div class="cell" id="I2"><span class="row coord">2</span></div>
-				<div class="cell" id="A1">
-					<span class="column coord">A</span>
-					<span class="blue stick" title="Talking Stick"></span>
-				</div>
-				<div class="cell" id="B1"><span class="column coord">B</span></div>
-				<div class="cell" id="C1"><span class="column coord">C</span></div>
-				<div class="cell" id="D1"><span class="column coord">D</span></div>
-				<div class="cell" id="E1"><span class="column coord">E</span></div>
-				<div class="cell" id="F1"><span class="column coord">F</span></div>
-				<div class="cell" id="G1"><span class="column coord">G</span></div>
-				<div class="cell" id="H1"><span class="column coord">H</span></div>
-				<div class="cell" id="I1">
-					<span class="row coord">1</span>
-					<span class="column coord">I</span>
-				</div>
-			</div>
-			<div class="arrows-outer">
-				<div class="arrows-shell">
-					<svg id="arrows" viewBox="-0.5 -0.5 9 9">
-						<defs>
-							<marker
-								id="arrowhead-0"
-								orient="auto"
-								markerWidth="4"
-								marker-height="4"
-								refX="2.05"
-								refY="2"
-								overflow="visible"
-							>
-								<path d="M 0 0 v 4 l 3 -2 Z" fill="var(--arrow-0)" />
-							</marker>
-							<marker
-								id="arrowhead-1"
-								orient="auto"
-								markerWidth="4"
-								marker-height="4"
-								refX="2.05"
-								refY="2"
-								overflow="visible"
-							>
-								<path d="M 0 0 v 4 l 3 -2 Z" fill="var(--arrow-1)" />
-							</marker>
-							<marker
-								id="arrowhead-2"
-								orient="auto"
-								markerWidth="4"
-								marker-height="4"
-								refX="2.05"
-								refY="2"
-								overflow="visible"
-							>
-								<path d="M 0 0 v 4 l 3 -2 Z" fill="var(--arrow-2)" />
-							</marker>
-							<marker
-								id="arrowhead-3"
-								orient="auto"
-								markerWidth="4"
-								marker-height="4"
-								refX="2.05"
-								refY="2"
-								overflow="visible"
-							>
-								<path d="M 0 0 v 4 l 3 -2 Z" fill="var(--arrow-3)" />
-							</marker>
-							<marker
-								id="arrowhead-4"
-								orient="auto"
-								markerWidth="4"
-								marker-height="4"
-								refX="2.05"
-								refY="2"
-								overflow="visible"
-							>
-								<path d="M 0 0 v 4 l 3 -2 Z" fill="var(--arrow-4)" />
-							</marker>
-							<marker
-								id="arrowhead-5"
-								orient="auto"
-								markerWidth="4"
-								marker-height="4"
-								refX="2.05"
-								refY="2"
-								overflow="visible"
-							>
-								<path d="M 0 0 v 4 l 3 -2 Z" fill="var(--arrow-5)" />
-							</marker>
-							<marker
-								id="arrowhead-6"
-								orient="auto"
-								markerWidth="4"
-								marker-height="4"
-								refX="2.05"
-								refY="2"
-								overflow="visible"
-							>
-								<path d="M 0 0 v 4 l 3 -2 Z" fill="var(--arrow-6)" />
-							</marker>
-							<marker
-								id="arrowhead-7"
-								orient="auto"
-								markerWidth="4"
-								marker-height="4"
-								refX="2.05"
-								refY="2"
-								overflow="visible"
-							>
-								<path d="M 0 0 v 4 l 3 -2 Z" fill="var(--arrow-7)" />
-							</marker>
-						</defs>
-						<g id="arrows-inner" />
-					</svg>
-				</div>
-			</div>
-		</div>
-		<div class="analysis-outer">
-			<div class="analysis">
-				<div class="moves-outer"><div id="moves"></div></div>
-			</div>
-		</div>
+		<script>document.getElementById('outer').style.cssText = '';</script>
 		<script src="./index.js"></script>
 	</body>
 </html>
