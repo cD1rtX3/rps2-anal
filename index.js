@@ -1,5 +1,3 @@
-'use strict';
-
 document.getElementById('board').addEventListener(
 	'contextmenu',
 	(e) => e.preventDefault()
@@ -29,6 +27,7 @@ const startpos = JSON.parse(`[
 	[0, 0, 0, 0, 6, 5, 0, 0, 0],
 	[0, 0, 0, 0, 0, 0, 0, 0, 0]
 ]`);
+/** The current pieces on the board, by row (*y*), then by column (*x*). */
 let board = [...startpos];
 let red_to_move = false;
 let current_fullmove = 1;
@@ -42,19 +41,21 @@ let rule50 = 0;
  * is the root or the location in the parent this variation is mentioned if it
  * isn't.
  *
- * Each subsequent element of the arrays is either an object or a number. If it
- * is an object, it is in the form `{px, py, tx, ty, captured, variations}`,
- * where `px` and `py` are the coörds of the start square, `tx` and `ty` are the
- * coörds of the target square, and `captured` is the piece which was captured
- * or zero if no piece was captured. If it is a number, this number is the ID of
- * a variation which may be branched into instead of the main variation in place
- * of the previous move/variation.
+ * Each subsequent element of the arrays is either a number or an object. If it
+ * is a number, this number is the ID of a variation which may be branched into
+ * in place of the previous move/variation. If it is an object, it is in the
+ * form `{px, py, tx, ty, captured, rule50_before}`, where `px` and `py` are the
+ * coörds of the start square, `tx` and `ty` are the coörds of the target
+ * square, `captured` is the piece which was captured or zero if no piece was
+ * captured, and `rule50_before` is the 100-move rule value before this move.
  */
 const history_tree = new Map(JSON.parse(
 	'[[0, [{"from_idx": 0, "depth": 0}]]]'
 ));
 /** A reference to the variation we are in. */
 let current_variation = history_tree.get(0);
+/** The ID of the variation we are in. */
+let current_variation_id = 0;
 /** The index of the previous move in the current variation. */
 let current_history_idx = 0;
 
@@ -95,8 +96,9 @@ const getFen = () => {
 			board_string += '/';
 		}
 	}
-	// i can't make the `DREAMS > DREAMS` joke in JS so please just pretend i did
-	return `${board_string} ${red_to_move ? 'r' : 'b'} -`;
+	// screw you henhen
+	return board_string
+		+ ` ${red_to_move ? 'r' : 'b'} ${rule50} ${current_fullmove}`;
 };
 
 const giveTalkingStick = () => {
@@ -110,12 +112,91 @@ const giveTalkingStick = () => {
 			.item(0).removeAttribute('style');
 	}
 }
-const piece_strings = ['', 'blue rock', 'blue paper', 'blue scissors', '', 'red rock', 'red paper', 'red scissors'];
 const board_element = document.getElementById('board');
 let active_piece = null;
 let drag_origin_x = 0;
 let drag_origin_y = 0;
 let drag_bounce_timeout;
+
+const couldTake = (piece, target_piece) => {
+	// The piece has to be ours.
+	if (!(piece & 3) || !!(piece & 4) !== red_to_move) {
+		return false;
+	}
+	// We can always capture air.
+	if (!target_piece) {
+		return true;
+	}
+	// We can't capture our own pieces.
+	if ((target_piece & 4) == (piece & 4)) {
+		return false;
+	}
+	// it's like we're in some king of intransitive capture system
+	switch (target_piece & 3) {
+		case ROCK:
+			if ((piece & 3) !== PAPER) {
+				return false;
+			}
+			break;
+		case PAPER:
+			if ((piece & 3) !== SCISSORS) {
+				return false;
+			}
+			break;
+		case SCISSORS:
+			if ((piece & 3) !== ROCK) {
+				return false;
+			}
+		default:
+	}
+	return true;
+};
+let active_square = {element: null};
+const drawLegals = () => {
+	const active_x = active_square.x;
+	const active_y = active_square.y;
+	if (typeof(active_x) === 'undefined'
+			|| typeof(active_y) === 'undefined') {
+		return;
+	}
+	const piece = board[active_y][active_x];
+	for (let off_y = -1; off_y <= 1; off_y++) {
+		const y = active_y + off_y;
+		if (y < 0 || y > 8) {
+			continue;
+		}
+		for (let off_x = -1; off_x <= 1; off_x++) {
+			if (!off_x && !off_y) {
+				continue;
+			}
+			const x = active_x + off_x;
+			if (x < 0 || x > 8) {
+				continue;
+			}
+			const target_piece = board[y][x];
+			if (!couldTake(piece, target_piece)) {
+				continue;
+			}
+			const square_element = document.getElementById(getSquareName(x, y));
+			if (target_piece) {
+				square_element.className += ' capture';
+			} else {
+				square_element.innerHTML
+					+= '<svg viewBox="0 0 8 8" class="dot"><circle cx="4" cy="4" r="1" /></svg>';
+			}
+		}
+	}
+};
+const clearLegals = () => {
+	[...document.getElementsByClassName('dot')].forEach((el) => el.remove());
+	[...document.getElementsByClassName('cell capture')].forEach((el) => {
+		const class_name = el.className;
+		el.className = class_name.slice(0, class_name.length - ' capture'.length);
+	});
+};
+
+let could_select = false;
+const piece_strings = ['', 'rock', 'paper', 'scissors'];
 const setUpBoard = () => {
 	let board_html = '';
 	// The top of the board is the last row.
@@ -125,7 +206,16 @@ const setUpBoard = () => {
 			const cell_name = getSquareName(x, y);
 			board_html
 				+= `<div class="cell" id="${cell_name}">`
-					+ (piece !== 0 ? `<span class="${piece_strings[piece]} piece"></span>` : '')
+					+ (
+						piece !== 0
+							? `<span class="${piece & 4 ? 'red' : 'blue'} piece"><svg viewBox="0 0 1 1">`
+								+ '<use'
+									+ ` href="./assets/webgoat/${piece_strings[piece & 3]}.svg#svg"`
+									+ ' x="0" y="0" width="1" height="1"'
+								+ '>'
+							+ '</span>'
+							: ''
+					)
 					+ (x === 8 ? `<span class="row coord">${cell_name[1]}</span>` : '')
 					+ (y === 0 ? `<span class="column coord">${cell_name[0]}</span>` : '')
 					+ (x === 8 && y == 8 ? '<span class="red stick" title="Talking Stick"></span>' : '')
@@ -134,21 +224,50 @@ const setUpBoard = () => {
 		}
 	}
 	board_element.innerHTML = board_html;
+	Array.prototype.forEach.call(document.getElementsByClassName('cell'), (el) => {
+		el.addEventListener('click', (e) => {
+			if (e.button !== 0 || active_piece || !active_square.element) {
+				return false;
+			}
+			const {x: tx, y: ty} = getNamedSquare(el.id);
+			if (tx < 0 || tx > 8 || ty < 0 || ty > 8) {
+				return false;
+			}
+			const {x: px, y: py} = active_square;
+			if (px === tx && py === ty) {
+				return false;
+			}
+			clearActiveSquare();
+			movePiece(px, py, tx, ty, false);
+		})
+	});
 	Array.prototype.forEach.call(document.getElementsByClassName('piece'), (el) => {
 		el.addEventListener('mousedown', (e) => {
 			if (e.button !== 0) {
 				return false;
 			}
+			const parent = el.parentElement;
+			const {x, y} = getNamedSquare(parent.id);
+			if (!(board[y][x] & 4) === red_to_move) {
+				return false;
+			}
 			if (typeof(drag_bounce_timeout) !== 'undefined') {
 				clearTimeout(drag_bounce_timeout);
 			}
+			if (active_square.element !== parent) {
+				active_square.element?.removeAttribute('active');
+				active_square.element = null;
+				active_square.x = x;
+				active_square.y = y;
+				drawLegals();
+			}
+			could_select = true;
 			el.setAttribute('active', 'active');
 			drag_origin_x = e.pageX;
 			drag_origin_y = e.pageY;
 			active_piece = el;
 			return dragPiece(e);
 		});
-		el.addEventListener('contextmenu', (e) => e.preventDefault());
 	});
 	giveTalkingStick();
 };
@@ -234,78 +353,88 @@ const printMoves = () => {
 							? 'current '
 							: ''
 					) + `move"`
-				+ ` id="ply${ply}"`
+				+ ` id="move;${ply};0"`
 			+ `>${getNotation(current, false)}</div>`;
 	}
 	moves_element.innerHTML = moves_html;
 }
 
-const movePiece = (piece_x, piece_y, target_x, target_y) => {
+/* ----------------------------- Piece movement ----------------------------- */
+
+const movePiece = (px, py, tx, ty, from_drag) => {
 	// Pieces move like kings.
-	if (piece_x == target_x && piece_y == target_y
-			|| Math.abs(target_x - piece_x) > 1
-			|| Math.abs(target_y - piece_y) > 1) {
+	if (px == tx && py == ty || Math.abs(tx - px) > 1 || Math.abs(ty - py) > 1) {
 		return false;
 	}
-	const piece = board[piece_y][piece_x];
-	// The piece has to be ours.
-	if (!(piece & 3) || !!(piece & 4) !== red_to_move) {
+	const piece = board[py][px];
+	const target_piece = board[ty][tx];
+	if (!couldTake(piece, target_piece)) {
 		return false;
 	}
-	// We can't capture our own pieces.
-	const target_piece = board[target_y][target_x];
-	if (target_piece && (target_piece & 4) == (piece & 4)) {
-		return false;
-	}
-	// it's like we're in some king of intransitive capture system
-	switch (target_piece & 3) {
-		case ROCK:
-			if ((piece & 3) !== PAPER) {
-				return false;
-			}
-			break;
-		case PAPER:
-			if ((piece & 3) !== SCISSORS) {
-				return false;
-			}
-			break;
-		case SCISSORS:
-			if ((piece & 3) !== ROCK) {
-				return false;
-			}
-		default:
-	}
-	// Seems legal to me!
-	board[piece_y][piece_x] = 0;
-	board[target_y][target_x] = piece;
+	board[py][px] = 0;
+	board[ty][tx] = piece;
 	current_fullmove += Number(red_to_move);
 	red_to_move = !red_to_move;
-	current_variation[++current_history_idx] = {
-		px: piece_x, py: piece_y,
-		tx: target_x, ty: target_y,
+	current_history_idx++;
+	const move = {
+		px: px, py: py,
+		tx: tx, ty: ty,
 		captured: target_piece,
+		rule50_before: rule50,
 	};
+	rule50 = target_piece ? 0 : rule50 + 1;
+	if (current_history_idx === current_variation.length) {
+		current_variation[current_history_idx] = move;
+	} else {
+		const id = getNextID();
+		current_variation.splice(current_history_idx, 0, id)
+		history_tree.set(id, [
+			{
+				from: current_variation_id,
+				from_idx: current_history_idx,
+				depth: current_variation[0].depth + 1
+			},
+			move,
+		]);
+		current_variation = history_tree.get(id);
+		current_variation_id = id;
+		current_history_idx = 1;
+	}
 	// TODO: immediate mode garbage
 	printMoves();
 
-	const piece_element = document.getElementById(getSquareName(piece_x, piece_y))
+	const piece_element = document.getElementById(getSquareName(px, py))
 			.getElementsByClassName('piece')
 			.item(0);
 	if (!piece_element) {
 		throw Error('Tried to move logical piece which doesn\'t exist in the DOM.');
 	}
 	piece_element.remove();
-	const target_square = document.getElementById(getSquareName(target_x, target_y));
+	const target_square = document.getElementById(getSquareName(tx, ty));
 	target_square.getElementsByClassName('piece').item(0)?.remove();
 	target_square.appendChild(piece_element);
 	// We need to clone the collection since we're messing with it while iterating.
 	[...document.getElementsByClassName('previous cell')]
 		.forEach((el) => el.className = 'cell');
-	document.getElementById(getSquareName(piece_x, piece_y)).className = 'previous cell';
-	document.getElementById(getSquareName(target_x, target_y)).className = 'previous cell';
+	document.getElementById(getSquareName(px, py)).className = 'previous cell';
+	document.getElementById(getSquareName(tx, ty)).className = 'previous cell';
 	giveTalkingStick();
+	if (from_drag || matchMedia?.('(prefers-reduced-motion)')?.matches) {
+		return true;
+	}
+	const rect = board_element.getBoundingClientRect();
+	// The board should be square.
+	const size = (rect.width - 2) / 9;
+	piece_element.style.cssText = 'transition: none; '
+			// The y-axis is inverted.
+			+ `transform: translate(${(px - tx) * size}px, ${(ty - py) * size}px);`;
+	drag_bounce_timeout = setTimeout(() => {
+		piece_element.removeAttribute('style');
+		drag_bounce_timeout = undefined;
+	});
 	return true;
 }
+
 /**
  * Gets the cell on the board the mouse is currently in.
  *
@@ -323,6 +452,16 @@ const getMousedCell = (e) => {
 		y: 8 - Math.floor(9 * (e.y - board_rect.y) / board_rect.height)
 	};
 }
+
+const clearActiveSquare = () => {
+	clearLegals();
+	active_square.x = undefined;
+	active_square.y = undefined;
+	if (active_square.element) {
+		active_square.element.removeAttribute('active');
+		active_square.element = null;
+	}
+};
 const dragRelease = (e) => {
 	if (!active_piece) {
 		return false;
@@ -331,12 +470,22 @@ const dragRelease = (e) => {
 	active_piece = null;
 	const {x: tx, y: ty} = getMousedCell(e);
 	if (0 <= tx && tx <= 8 && 0 <= ty && ty <= 8) {
-		const {x: px, y: py} = getNamedSquare(piece.parentElement.id);
-		movePiece(px, py, tx, ty);
+		const parent = piece.parentElement;
+		const {x: px, y: py} = getNamedSquare(parent.id);
+		if (could_select && px === tx && py === ty && !active_square.element) {
+			active_square = {x: tx, y: ty, element: parent};
+			parent.setAttribute('active', 'active');
+		} else {
+			clearActiveSquare();
+			movePiece(px, py, tx, ty, true);
+		}
 	}
 	piece.removeAttribute('active');
-	piece.removeAttribute('style');
-	piece.style.cssText = 'transition: none; width: 91.7%; height: 91.7%;';
+	if (matchMedia?.('(prefers-reduced-motion)')?.matches) {
+		piece.removeAttribute('style');
+		return true;
+	}
+	piece.style.cssText = 'transition: none; transform: scale(0.925);';
 	drag_bounce_timeout = setTimeout(() => {
 		piece.removeAttribute('style');
 		drag_bounce_timeout = undefined;
@@ -350,6 +499,10 @@ const dragPiece = (e) => {
 	}
 	if (!active_piece) {
 		return false;
+	}
+	const {x, y} = getMousedCell(e);
+	if (x !== active_square.x || y !== active_square.y) {
+		could_select = false;
 	}
 	const rect = active_piece.parentElement.getBoundingClientRect();
 	active_piece.style.cssText = `left: ${e.x - rect.x - 0.5 * rect.width}px;`
@@ -369,13 +522,15 @@ Array.prototype.forEach.call(document.getElementsByClassName('icon'), (el) => {
 	});
 });
 
+/* --------------------------------- Arrows --------------------------------- */
+
 const arrowCircle = (x, y, color, is_ghost) => '<circle'
 		+ ` id="${is_ghost ? 'ghost' : `arr${x}${y}${x}${y}`}"`
 		+ (is_ghost ? 'opacity="0.707"' : '')
 		+ ` cx="${x}" cy="${y}"`
 		+ ' r="0.46875"'
 		+ ' fill="none"'
-		+ ` stroke="var(--arrow-${color})"`
+		+ ` stroke="var(--color-${color})"`
 		+ ' stroke-width="0.0625" />';
 const arrowPoint = (px, py, tx, ty, color, is_ghost) => {
 	// We have to manually subtract the stroke width from the length.
@@ -390,7 +545,7 @@ const arrowPoint = (px, py, tx, ty, color, is_ghost) => {
 		)
 		+ ` x1="${px}" y1="${py}"`
 		+ ` x2="${tx - w * norm}" y2="${ty - h * norm}"`
-		+ ` stroke="var(--arrow-${color})"`
+		+ ` stroke="var(--color-${color})"`
 		+ ' stroke-width="0.15625"'
 		+ ' stroke-linecap="round"'
 		+ ` marker-end="url(#arrowhead-${color})" />`;
@@ -451,10 +606,12 @@ board_element.addEventListener('mousedown', (e) => {
 		arrow_element.innerHTML = '';
 		return false;
 	}
-	({x: ghost.px, y: ghost.py} = getMousedCell(e));
-	ghost.py = 8 - ghost.py;
-	ghost.tx = ghost.px;
-	ghost.ty = ghost.py;
+	const {x, y} = getMousedCell(e);
+	if (x < 0 || x > 8 || y < 0 || y > 8) {
+		return false;
+	}
+	ghost.px = ghost.tx = x;
+	ghost.py = ghost.ty = 8 - y;
 	ghost.color = 1 * Number(e.shiftKey) | 2 * Number(e.ctrlKey) | 4 * Number(e.altKey);
 	drawGhost();
 	ghost.present = true;

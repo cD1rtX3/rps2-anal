@@ -1,2 +1,3 @@
-The SVGs in this repository were drawn by webgoatguy and were nicked from Meaf's
-site. They are copyright webgoatguy 2026.
+The SVGs in this repository were drawn by webgoatguy, nicked from Meaf's site,
+and modified by Ms. Rosinflower to allow embedding and outlining. They are
+copyright webgoatguy 2026, all rights reserved.

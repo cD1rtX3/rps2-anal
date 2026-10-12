@@ -23,17 +23,20 @@
 	--previous: #decbcb;
 	--previous-red: #f7c1bb;
 	--previous-blue: #d4cfce;
-	--arrow-0: #dc8a78;
-	--arrow-1: #d20f39;
-	--arrow-2: #40a02b;
-	--arrow-3: #df8e1d;
-	--arrow-4: #1e66f5;
-	--arrow-5: #8839ef;
-	--arrow-6: #179299;
-	--arrow-7: #7c7f93;
+	--color-0: #dc8a78;
+	--color-1: #d20f39;
+	--color-2: #40a02b;
+	--color-3: #df8e1d;
+	--color-4: #1e66f5;
+	--color-5: #8839ef;
+	--color-6: #179299;
+	--color-7: #7c7f93;
 	--surface-2: #d9a39a;
 	--surface-1: #bcc0cc;
 	--surface-0: #ccd0da;
+	--outline: transparent;
+	--translucent: 60%;
+	--move-dot: #a1a5b4;
 }
 :root[theme=mocha] {
 	background-color: #1e1e2e;
@@ -48,21 +51,25 @@
 	--previous: #2b2932;
 	--previous-red: #492f35;
 	--previous-blue: #2c3a41;
-	--arrow-0: #f5e0dc;
-	--arrow-1: #f38ba8;
-	--arrow-2: #a6e3a1;
-	--arrow-3: #f9e2af;
-	--arrow-4: #89b4fa;
-	--arrow-5: #cba6f7;
-	--arrow-6: #94e2d5;
-	--arrow-7: #9399b2;
+	--color-0: #f5e0dc;
+	--color-1: #f38ba8;
+	--color-2: #a6e3a1;
+	--color-3: #f9e2af;
+	--color-4: #89b4fa;
+	--color-5: #cba6f7;
+	--color-6: #94e2d5;
+	--color-7: #9399b2;
 	--surface-2: #5e5a68;
 	--surface-1: #45475a;
 	--surface-0: #313244;
+	--outline: transparent;
+	--translucent: 60%;
+	--move-dot: #5a5e71;
 }
 
 body {
 	margin: 0;
+	overflow-x: hidden;
 }
 #outer, .board-outer {
 	display: flex;
@@ -96,6 +103,11 @@ body {
 	align-items: center;
 	justify-content: center;
 	background-color: var(--crust);
+	box-shadow: inset 0 0 0 4px transparent;
+	transition: box-shadow 0.0625s linear;
+}
+.cell[active=active] {
+	box-shadow: inset 0 0 0 4px var(--color-0);
 }
 .cell#I9 {
 	background: var(--crust-red);
@@ -111,6 +123,18 @@ body {
 }
 .cell#A1.previous {
 	background: var(--previous-blue);
+}
+.dot {
+	position: absolute;
+	width: 100%;
+	height: 100%;
+	fill: var(--move-dot);
+}
+.dot:hover {
+	background-color: var(--move-dot);
+}
+.capture.cell {
+	box-shadow: inset 0 0 0 4px var(--move-dot);
 }
 
 .arrows-outer {
@@ -128,7 +152,6 @@ body {
 	padding: 1px;
 }
 #arrows {
-	/* Each cell could be thought of as reaching 1px further on every side. */
 	opacity: 60%;
 	width: 100%;
 	height: 100%;
@@ -167,34 +190,21 @@ body {
 }
 
 .red.piece {
-	background-color: var(--red);
+	color: var(--red);
 }
 .blue.piece {
-	background-color: var(--blue);
-}
-.rock.piece {
-	-webkit-mask: var(--rock);
-	mask: var(--rock);
-}
-.paper.piece {
-	-webkit-mask: var(--paper);
-	mask: var(--paper);
-}
-.scissors.piece {
-	-webkit-mask: var(--scissors);
-	mask: var(--scissors);
+	color: var(--blue);
 }
 .piece {
-	position: relative;
+	position: absolute;
+	z-index: 1;
 	width: 100%;
 	height: 100%;
 	cursor: grab;
-	transition: width 0.25s var(--quad-out), height 0.25s var(--quad-out);
 }
 .piece[active=active] {
 	z-index: 10;
 	cursor: grabbing;
-	transition: none;
 }
 
 .analysis-outer {
@@ -211,7 +221,7 @@ body {
 	display: flex;
 	flex-direction: column-reverse;
 	margin: 1px;
-	overflow-y: auto;
+	overflow-y: scroll;
 	scrollbar-color: var(--surface-2) transparent;
 	background-color: var(--crust);
 	flex: 1 1 auto;
@@ -288,7 +298,6 @@ body {
 .icon#settings {
 	-webkit-mask: url('./assets/gear.svg');
 	mask: url('./assets/gear.svg');
-	transition: rotate 0.25s linear;
 }
 .icon#settings[active=active] {
 	rotate: 90deg;
@@ -300,6 +309,9 @@ body {
 		--size: 78vh;
 		/* more subpixel alignment garbage */
 		--size: round(78vh, 1px);
+	}
+	body {
+		overflow-y: hidden;
 	}
 	#outer {
 		flex-direction: row;
@@ -332,5 +344,17 @@ body {
 	}
 	.analysis-outer, .sidebar-outer {
 		width: var(--size);
+	}
+}
+
+@media not (prefers-reduced-motion) {
+	.piece {
+		transition: transform 0.2s var(--quad-out);
+	}
+	.piece[active=active] {
+		transition: none;
+	}
+	.icon#settings {
+		transition: rotate 0.25s linear;
 	}
 }
