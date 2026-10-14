@@ -34,9 +34,7 @@
 	--surface-2: #d9a39a;
 	--surface-1: #bcc0cc;
 	--surface-0: #ccd0da;
-	--outline: transparent;
-	--translucent: 60%;
-	--move-dot: #a1a5b4;
+	--move-dot: #7c7f9399;
 }
 :root[theme=mocha] {
 	background-color: #1e1e2e;
@@ -62,9 +60,11 @@
 	--surface-2: #5e5a68;
 	--surface-1: #45475a;
 	--surface-0: #313244;
+	--move-dot: #9399b299;
+}
+:root[theme=latte], :root[theme=mocha] {
 	--outline: transparent;
 	--translucent: 60%;
-	--move-dot: #5a5e71;
 }
 
 body {
@@ -103,7 +103,6 @@ body {
 	align-items: center;
 	justify-content: center;
 	background-color: var(--crust);
-	box-shadow: inset 0 0 0 4px transparent;
 }
 .cell[active=active] {
 	box-shadow: inset 0 0 0 4px var(--color-0);
@@ -131,9 +130,7 @@ body {
 }
 .dot:hover {
 	background-color: var(--move-dot);
-}
-.capture.cell {
-	box-shadow: inset 0 0 0 4px var(--move-dot);
+	fill: transparent;
 }
 
 .arrows-outer {
@@ -205,6 +202,9 @@ body {
 	z-index: 10;
 	cursor: grabbing;
 }
+.piece[opponent=opponent] {
+	pointer-events: none;
+}
 
 .analysis-outer {
 	display: flex;
@@ -232,7 +232,7 @@ body {
 	font-size: round(1.33em, 1px);
 	flex: 1 1 auto;
 	grid-template-columns: auto 1fr 1fr;
-	grid-auto-rows: 2em;
+	grid-auto-rows: min-content;
 	gap: 2px;
 }
 .move-number {
@@ -242,6 +242,7 @@ body {
 	box-sizing: content-box;
 	padding: 0 0.5ch;
 	min-width: 2ch;
+	height: 2em;
 	font-family: serif;
 	font-style: italic;
 	background-color: var(--surface-1);
@@ -250,24 +251,46 @@ body {
 	display: flex;
 	justify-content: center;
 	align-items: center;
+	height: 2em;
 	background-color: var(--surface-0);
 	overflow: visible;
+	cursor: pointer;
 }
 .move.gap {
 	background-color: transparent;
+	cursor: default;
 }
 .variation-box {
-	font-size: 0.75em;
+	font-size: 1rem;
+	font-size: round(1rem, 1px);
 	grid-column: 1 / span 3;
 	border-top: 1px solid var(--wall);
 	border-bottom: 1px solid var(--wall);
-	padding: 0.25em;
+	padding: 0.25em 0;
+}
+.variation {
+	list-style-type: '\251c';
+	padding-inline-start: 1em;
+	margin: 0;
+}
+.variation > li {
+	padding-inline-start: 0.25ch;
+}
+.variation > li:last-child {
+	list-style-type: '\2514';
 }
 .variation-move {
-	padding: 0 0.5ch;
+	padding: 0 0.25ch;
+	cursor: pointer;
 }
 .current {
 	background-color: var(--surface-2);
+}
+.move:hover, .variation-move:hover {
+	background-color: var(--surface-2);
+}
+.move.gap:hover {
+	background-color: transparent;
 }
 
 .sidebar-outer {

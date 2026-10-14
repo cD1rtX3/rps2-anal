@@ -43,8 +43,8 @@ let rule50 = 0;
  *
  * Each subsequent element of the arrays is either a number or an object. If it
  * is a number, this number is the ID of a variation which may be branched into
- * in place of the previous move/variation. If it is an object, it is in the
- * form `{px, py, tx, ty, captured, rule50_before}`, where `px` and `py` are the
+ * in place of the next move/variation. If it is an object, it is in the form
+ * `{px, py, tx, ty, captured, rule50_before}`, where `px` and `py` are the
  * coörds of the start square, `tx` and `ty` are the coörds of the target
  * square, `captured` is the piece which was captured or zero if no piece was
  * captured, and `rule50_before` is the 100-move rule value before this move.
@@ -101,22 +101,305 @@ const getFen = () => {
 		+ ` ${red_to_move ? 'r' : 'b'} ${rule50} ${current_fullmove}`;
 };
 
-const giveTalkingStick = () => {
-	document.getElementsByClassName(red_to_move ? 'blue stick' : 'red stick')
-		.item(0).style.cssText = 'display: none;';
+const setSide = () => {
+	const to_move = red_to_move ? 'red ' : 'blue ';
+	const opponent = red_to_move ? 'blue ' : 'red ';
+	document.getElementsByClassName(opponent + 'stick').item(0).style.cssText
+		= 'display: none;';
 	if (board[red_to_move ? 8 : 0][red_to_move ? 8 : 0]) {
-		document.getElementsByClassName(red_to_move ? 'red stick' : 'blue stick')
+		document.getElementsByClassName(to_move + 'stick')
 			.item(0).style.cssText = 'pointer-events: none;';
 	} else {
-		document.getElementsByClassName(red_to_move ? 'red stick' : 'blue stick')
+		document.getElementsByClassName(to_move + 'stick')
 			.item(0).removeAttribute('style');
 	}
+	Array.prototype.forEach.call(
+		document.getElementsByClassName(to_move + 'piece'),
+		(el) => el.removeAttribute('opponent')
+	);
+	Array.prototype.forEach.call(
+		document.getElementsByClassName(opponent + 'piece'),
+		(el) => el.setAttribute('opponent', 'opponent')
+	);
 }
 const board_element = document.getElementById('board');
 let active_piece = null;
 let drag_origin_x = 0;
 let drag_origin_y = 0;
-let drag_bounce_timeout;
+let active_square = {element: null};
+
+const piece_strings = ['', 'rock', 'paper', 'scissors'];
+const setUpBoard = () => {
+	let board_html = '';
+	// The top of the board is the last row.
+	for (let y = 9; y-- > 0;) {
+		for (let x = 0; x < 9; x++) {
+			const piece = board[y][x];
+			const cell_name = getSquareName(x, y);
+			board_html
+				+= `<div class="cell" id="${cell_name}">`
+					+ (
+						piece !== 0
+							? `<span class="${piece & 4 ? 'red' : 'blue'} piece"><svg viewBox="0 0 1 1">`
+								+ '<use'
+									+ ` href="./assets/webgoat/${piece_strings[piece & 3]}.svg#svg"`
+									+ ' x="0" y="0" width="1" height="1"'
+								+ '>'
+							+ '</span>'
+							: ''
+					)
+					+ (x === 8 ? `<span class="row coord">${cell_name[1]}</span>` : '')
+					+ (y === 0 ? `<span class="column coord">${cell_name[0]}</span>` : '')
+					+ (x === 8 && y == 8 ? '<span class="red stick" title="Talking Stick"></span>' : '')
+					+ (x === 0 && y == 0 ? '<span class="blue stick" title="Talking Stick"></span>' : '')
+				+ '</div>';
+		}
+	}
+	board_element.innerHTML = board_html;
+	Array.prototype.forEach.call(document.getElementsByClassName('cell'), (el) => {
+		el.addEventListener('click', (e) => {
+			if (e.button !== 0 || active_piece || !active_square.clicked) {
+				return false;
+			}
+			const {x: tx, y: ty} = getNamedSquare(el.id);
+			if (tx < 0 || tx > 8 || ty < 0 || ty > 8) {
+				return false;
+			}
+			const {x: px, y: py} = active_square;
+			if (px === tx && py === ty) {
+				return false;
+			}
+			clearActiveSquare();
+			movePiece(px, py, tx, ty, false);
+		})
+	});
+	Array.prototype.forEach.call(document.getElementsByClassName('piece'), (el) => {
+		el.addEventListener('mousedown', (e) => {
+			if (e.button !== 0) {
+				return false;
+			}
+			const parent = el.parentElement;
+			const {x, y} = getNamedSquare(parent.id);
+			if (!(board[y][x] & 4) === red_to_move) {
+				return false;
+			}
+			if (active_square.element !== parent) {
+				active_square.element?.removeAttribute('active');
+				active_square.x = x;
+				active_square.y = y;
+				drawLegals();
+			}
+			active_square.element = parent;
+			active_square.element.setAttribute('active', 'active');
+			el.setAttribute('active', 'active');
+			drag_origin_x = e.pageX;
+			drag_origin_y = e.pageY;
+			active_piece = el;
+			return dragPiece(e);
+		});
+	});
+	setSide();
+};
+setUpBoard();
+setSide();
+
+/* ------------------------------ Move history ------------------------------ */
+
+const getNotation = (move, ascii) => getSquareName(move.px, move.py)
+		+ (move.captured ? ascii ? 'x' : '&times;' : ascii ? '-' : '&ndash;&NoBreak;')
+		+ getSquareName(move.tx, move.ty);
+
+const navigateToMove = (variation_id, idx) => {
+	let common_ancestor_id = current_variation_id;
+	let variation_common_idx = idx;
+	let variation_idx_hist;
+	if (current_variation_id !== variation_id) {
+		variation_idx_hist = [];
+		let variation_ancestor_id = variation_id;
+		let current_common_idx = current_history_idx;
+		let c0 = history_tree.get(common_ancestor_id)[0];
+		let v0 = history_tree.get(variation_ancestor_id)[0];
+		while (common_ancestor_id !== variation_ancestor_id) {
+			if (!c0.depth && !v0.depth) {
+				throw Error('Move history tree has two roots!');
+			}
+			if (c0.depth >= v0.depth) {
+				common_ancestor_id = c0.from;
+				current_common_idx = c0.from_idx;
+				c0 = history_tree.get(common_ancestor_id)[0];
+			}
+			// If the two were equal, this will now be true.
+			if (c0.depth < v0.depth) {
+				variation_ancestor_id = v0.from;
+				variation_idx_hist.push(variation_common_idx);
+				variation_common_idx = v0.from_idx;
+				v0 = history_tree.get(variation_ancestor_id)[0];
+			}
+		}
+	}
+
+	const should_animate = !matchMedia('(prefers-reduced-motion)').matches;
+	// In order to animate, we need to know where the pieces came from.
+	let old_from_new;
+	if (should_animate) {
+		old_from_new = new Uint8Array(81).map((_, i) => i);
+	}
+
+	const stepForward = () => {
+		const item = current_variation[++current_history_idx];
+		if (typeof(item) !== 'object') {
+			return;
+		}
+		if (should_animate) {
+			old_from_new[9 * item.ty + item.tx] = old_from_new[9 * item.py + item.px];
+		}
+		rule50 = board[item.ty][item.tx] ? 0 : rule50 + 1;
+		board[item.ty][item.tx] = board[item.py][item.px];
+		board[item.py][item.px] = 0;
+		if (red_to_move) {
+			current_fullmove++;
+		}
+		red_to_move = !red_to_move;
+	};
+	const stepBackward = () => {
+		const item = current_variation[current_history_idx--];
+		if (typeof(item) !== 'object') {
+			return;
+		}
+		if (should_animate) {
+			old_from_new[9 * item.py + item.px] = old_from_new[9 * item.ty + item.tx];
+		}
+		board[item.py][item.px] = board[item.ty][item.tx];
+		board[item.ty][item.tx] = item.captured;
+		rule50 = item.rule50_before;
+		if (!red_to_move) {
+			current_fullmove--;
+		}
+		red_to_move = !red_to_move;
+	}
+	while (current_variation_id !== common_ancestor_id) {
+		while (current_history_idx > 0) {
+			stepBackward();
+		}
+		const header = current_variation[0];
+		current_variation_id = header.from;
+		current_variation = history_tree.get(current_variation_id);
+		current_history_idx = header.from_idx;
+	}
+	if (current_history_idx < variation_common_idx) {
+		do {
+			stepForward();
+		} while (current_history_idx < variation_common_idx);
+	} else if (current_history_idx > variation_common_idx) {
+		do {
+			stepBackward();
+		} while (current_history_idx > variation_common_idx);
+	}
+	while (current_variation_id !== variation_id) {
+		current_variation_id = current_variation[current_history_idx];
+		current_variation = history_tree.get(current_variation_id);
+		current_history_idx = 0;
+		const target = variation_idx_hist.pop();
+		if (typeof(target) === 'undefined') {
+			throw Error('coarse you fucked up your algorithm');
+		}
+		while (current_history_idx < target) {
+			stepForward();
+		}
+	}
+	// TODO: smoothly animate; highlight last move
+	setUpBoard();
+	// TODO: immediate mode garbage
+	printMoves();
+}
+
+const getVariationHTML = (id, ply, current_ply) => {
+	let moves_html = '<li>'
+	const variation = history_tree.get(id);
+	for (let i = 1; i < variation.length; i++) {
+		let current = variation[i];
+		if (typeof(current) == 'number') {
+			moves_html += '<ul class="variation">';
+			do {
+				moves_html += getVariationHTML(current, ply, current_ply);
+			} while (typeof(current = variation[++i]) === 'number');
+			moves_html += "</ul>"
+			if (i === variation.length) {
+				break;
+			}
+		}
+		if (typeof(current) !== 'object') {
+			throw Error(`Got bad move: ${current}.`);
+		}
+		moves_html
+			+= '<span'
+				+ ' class="' + (
+					current_variation_id === id && ply === current_ply
+							? 'current '
+							: ''
+				) + 'variation-move"'
+				+ ` id="${ply};${id}"`
+			+ '>'
+				+ `${(ply >> 1) + 1}${ply & 1 ? '&hellip;' : '.'}&nbsp;`
+				+ getNotation(current, false)
+			+ '</span>&ZeroWidthSpace;';
+		ply++;
+	}
+	return moves_html;
+}
+const moves_element = document.getElementById('moves');
+const printMoves = () => {
+	const root_variation = history_tree.get(0);
+	if (root_variation.length < 2) {
+		moves_element.innerHTML = '';
+		return;
+	}
+	let moves_html = '';
+	let have_fullmove_label = false;
+	/*
+	 * This will be negative in the starting position, but that just means
+	 * there are no moves selected.
+	 */
+	const current_ply = 2 * current_fullmove + Number(red_to_move) - 3;
+	let ply = root_variation[0].from_idx;
+	for (let i = 1; i < root_variation.length; i++) {
+		let current = root_variation[i];
+		if (typeof(current) === 'number') {
+			moves_html += '<div class="variation-box"><ul class="variation">';
+			do {
+				moves_html += getVariationHTML(current, ply, current_ply);
+			} while (typeof(current = root_variation[++i]) === 'number');
+			moves_html += "</ul></div>"
+			if (i === root_variation.length) {
+				break;
+			}
+			have_fullmove_label = false;
+		}
+		if (typeof(current) !== 'object') {
+			throw Error(`Got bad move: ${current}.`);
+		}
+		if (!(ply & 1) || !have_fullmove_label) {
+			moves_html += `<div class="move-number">${(ply >> 1) + 1}</div>`;
+			if (ply & 1) {
+				moves_html += '<div class="move gap">&hellip;</div>'
+			}
+			have_fullmove_label = true;
+		}
+		moves_html
+			+= '<div'
+				+ ' class="' + (
+						current_variation_id === 0 && ply === current_ply
+							? 'current '
+							: ''
+					) + 'move"'
+				+ ` id="${ply};0"`
+			+ `>${getNotation(current, false)}</div>`;
+		ply++;
+	}
+	moves_element.innerHTML = moves_html;
+}
+
+/* ----------------------------- Piece movement ----------------------------- */
 
 const couldTake = (piece, target_piece) => {
 	// The piece has to be ours.
@@ -151,7 +434,11 @@ const couldTake = (piece, target_piece) => {
 	}
 	return true;
 };
-let active_square = {element: null};
+const move_svg
+	= '<svg viewBox="0 0 14 14" class="dot"><circle cx="7" cy="7" r="2" /></svg>';
+const capture_svg = '<svg viewBox="2 2 30 30" class="dot"><path d="'
+		+ 'M 2 2 h 30 v 30 h -30 Z M 0 17 a 17 17 0 0 0 34 0 a 17 17 0 0 0 -34 0 Z'
+	+ '" /></svg>';
 const drawLegals = () => {
 	const active_x = active_square.x;
 	const active_y = active_square.y;
@@ -179,187 +466,16 @@ const drawLegals = () => {
 			}
 			const square_element = document.getElementById(getSquareName(x, y));
 			if (target_piece) {
-				square_element.className += ' capture';
+				square_element.innerHTML += capture_svg;
 			} else {
-				square_element.innerHTML
-					+= '<svg viewBox="0 0 8 8" class="dot"><circle cx="4" cy="4" r="1" /></svg>';
+				square_element.innerHTML += move_svg;
 			}
 		}
 	}
 };
 const clearLegals = () => {
 	[...document.getElementsByClassName('dot')].forEach((el) => el.remove());
-	[...document.getElementsByClassName('cell capture')].forEach((el) => {
-		const class_name = el.className;
-		el.className = class_name.slice(0, class_name.length - ' capture'.length);
-	});
 };
-
-let could_select = false;
-const piece_strings = ['', 'rock', 'paper', 'scissors'];
-const setUpBoard = () => {
-	let board_html = '';
-	// The top of the board is the last row.
-	for (let y = 9; y-- > 0;) {
-		for (let x = 0; x < 9; x++) {
-			const piece = board[y][x];
-			const cell_name = getSquareName(x, y);
-			board_html
-				+= `<div class="cell" id="${cell_name}">`
-					+ (
-						piece !== 0
-							? `<span class="${piece & 4 ? 'red' : 'blue'} piece"><svg viewBox="0 0 1 1">`
-								+ '<use'
-									+ ` href="./assets/webgoat/${piece_strings[piece & 3]}.svg#svg"`
-									+ ' x="0" y="0" width="1" height="1"'
-								+ '>'
-							+ '</span>'
-							: ''
-					)
-					+ (x === 8 ? `<span class="row coord">${cell_name[1]}</span>` : '')
-					+ (y === 0 ? `<span class="column coord">${cell_name[0]}</span>` : '')
-					+ (x === 8 && y == 8 ? '<span class="red stick" title="Talking Stick"></span>' : '')
-					+ (x === 0 && y == 0 ? '<span class="blue stick" title="Talking Stick"></span>' : '')
-				+ '</div>';
-		}
-	}
-	board_element.innerHTML = board_html;
-	Array.prototype.forEach.call(document.getElementsByClassName('cell'), (el) => {
-		el.addEventListener('click', (e) => {
-			if (e.button !== 0 || active_piece || !active_square.element) {
-				return false;
-			}
-			const {x: tx, y: ty} = getNamedSquare(el.id);
-			if (tx < 0 || tx > 8 || ty < 0 || ty > 8) {
-				return false;
-			}
-			const {x: px, y: py} = active_square;
-			if (px === tx && py === ty) {
-				return false;
-			}
-			clearActiveSquare();
-			movePiece(px, py, tx, ty, false);
-		})
-	});
-	Array.prototype.forEach.call(document.getElementsByClassName('piece'), (el) => {
-		el.addEventListener('mousedown', (e) => {
-			if (e.button !== 0) {
-				return false;
-			}
-			const parent = el.parentElement;
-			const {x, y} = getNamedSquare(parent.id);
-			if (!(board[y][x] & 4) === red_to_move) {
-				return false;
-			}
-			if (typeof(drag_bounce_timeout) !== 'undefined') {
-				clearTimeout(drag_bounce_timeout);
-			}
-			if (active_square.element !== parent) {
-				active_square.element?.removeAttribute('active');
-				active_square.element = null;
-				active_square.x = x;
-				active_square.y = y;
-				drawLegals();
-			}
-			could_select = true;
-			el.setAttribute('active', 'active');
-			drag_origin_x = e.pageX;
-			drag_origin_y = e.pageY;
-			active_piece = el;
-			return dragPiece(e);
-		});
-	});
-	giveTalkingStick();
-};
-setUpBoard();
-
-const getNotation = (move, ascii) => getSquareName(move.px, move.py)
-		+ (move.captured ? ascii ? 'x' : '&times;' : ascii ? '-' : '&ndash;')
-		+ getSquareName(move.tx, move.ty);
-const getVariationHTML = (id, ply, current_ply) => {
-	let moves_html = '<li>'
-	const variation = history_tree.get(id);
-	for (let i = 1; i < variation.length; i++) {
-		const current = variation[i];
-		if (typeof(current) == 'number') {
-			moves_html += '<ul>';
-			do {
-				moves_html += getVariationHTML(current, ply);
-			} while (typeof(current = root_variation[++i]) === 'number');
-			moves_html += "</ul>"
-			if (i === root_variation.length) {
-				break;
-			}
-		}
-		ply++;
-		if (typeof(current) !== 'object') {
-			throw Error(`Got bad move: ${current}.`);
-		}
-		moves_html
-			+= '<span'
-				+ ' class="' + (
-					variation === current_variation && ply === current_ply
-				) + 'variation-move"'
-			+ '>'
-				+ `${(ply >> 1) + 1}${ply & 1 ? '&hellip;' : '.'}&nbsp;`
-				+ getNotation(current, false);
-			+ '</span>';
-	}
-	return moves_html;
-}
-const moves_element = document.getElementById('moves');
-const printMoves = () => {
-	const root_variation = history_tree.get(0);
-	if (root_variation.length < 2) {
-		moves_element.innerHTML = '';
-		return;
-	}
-	let moves_html = '';
-	let have_fullmove_label = false;
-	/*
-	 * This will be negative in the starting position, but that just means
-	 * there are no moves selected.
-	 */
-	const current_ply = 2 * current_fullmove + Number(red_to_move) - 3;
-	let ply = root_variation[0].from_idx - 1;
-	for (let i = 1; i < root_variation.length; i++) {
-		const current = root_variation[i];
-		if (typeof(current) === 'number') {
-			moves_html += '<div class="variation-box"><ul>';
-			do {
-				moves_html += getVariationHTML(current, ply, current_ply);
-			} while (typeof(current = root_variation[++i]) === 'number');
-			moves_html += "</ul></div>"
-			if (i === root_variation.length) {
-				break;
-			}
-			have_fullmove_label = false;
-		}
-		ply++;
-		if (typeof(current) !== 'object') {
-			throw Error(`Got bad move: ${current}.`);
-		}
-		if (!(ply & 1) || !have_fullmove_label) {
-			moves_html += `<div class="move-number">${(ply >> 1) + 1}</div>`;
-			if (ply & 1) {
-				moves_html += '<div class="move gap">&hellip;</div>'
-			}
-			have_fullmove_label = true;
-		}
-		moves_html
-			+= '<div'
-				+ ' class="' + (
-						root_variation === current_variation && ply === current_ply
-							? 'current '
-							: ''
-					) + `move"`
-				+ ` id="move;${ply};0"`
-			+ `>${getNotation(current, false)}</div>`;
-	}
-	moves_element.innerHTML = moves_html;
-}
-
-/* ----------------------------- Piece movement ----------------------------- */
 
 const movePiece = (px, py, tx, ty, from_drag) => {
 	// Pieces move like kings.
@@ -386,8 +502,11 @@ const movePiece = (px, py, tx, ty, from_drag) => {
 	if (current_history_idx === current_variation.length) {
 		current_variation[current_history_idx] = move;
 	} else {
+		while (typeof(current_variation[current_history_idx]) === 'number') {
+			current_history_idx++;
+		}
 		const id = getNextID();
-		current_variation.splice(current_history_idx, 0, id)
+		current_variation.splice(current_history_idx, 0, id);
 		history_tree.set(id, [
 			{
 				from: current_variation_id,
@@ -396,6 +515,12 @@ const movePiece = (px, py, tx, ty, from_drag) => {
 			},
 			move,
 		]);
+		for (let i = current_history_idx + 1; i < current_variation.length; i++) {
+			const item = current_variation[current_history_idx];
+			if (typeof(item) === 'number') {
+				history_tree.get(item).from_idx++;
+			}
+		}
 		current_variation = history_tree.get(id);
 		current_variation_id = id;
 		current_history_idx = 1;
@@ -418,7 +543,7 @@ const movePiece = (px, py, tx, ty, from_drag) => {
 		.forEach((el) => el.className = 'cell');
 	document.getElementById(getSquareName(px, py)).className = 'previous cell';
 	document.getElementById(getSquareName(tx, ty)).className = 'previous cell';
-	giveTalkingStick();
+	setSide();
 	if (from_drag || matchMedia?.('(prefers-reduced-motion)')?.matches) {
 		return true;
 	}
@@ -428,10 +553,7 @@ const movePiece = (px, py, tx, ty, from_drag) => {
 	piece_element.style.cssText = 'transition: none; '
 			// The y-axis is inverted.
 			+ `transform: translate(${(px - tx) * size}px, ${(ty - py) * size}px);`;
-	drag_bounce_timeout = setTimeout(() => {
-		piece_element.removeAttribute('style');
-		drag_bounce_timeout = undefined;
-	});
+	setTimeout(() => piece_element.removeAttribute('style'));
 	return true;
 }
 
@@ -461,6 +583,7 @@ const clearActiveSquare = () => {
 		active_square.element.removeAttribute('active');
 		active_square.element = null;
 	}
+	active_square.clicked = false;
 };
 const dragRelease = (e) => {
 	if (!active_piece) {
@@ -472,9 +595,8 @@ const dragRelease = (e) => {
 	if (0 <= tx && tx <= 8 && 0 <= ty && ty <= 8) {
 		const parent = piece.parentElement;
 		const {x: px, y: py} = getNamedSquare(parent.id);
-		if (could_select && px === tx && py === ty && !active_square.element) {
-			active_square = {x: tx, y: ty, element: parent};
-			parent.setAttribute('active', 'active');
+		if (px === tx && py === ty && !active_square.clicked) {
+			active_square.clicked = true;
 		} else {
 			clearActiveSquare();
 			movePiece(px, py, tx, ty, true);
@@ -486,10 +608,7 @@ const dragRelease = (e) => {
 		return true;
 	}
 	piece.style.cssText = 'transition: none; transform: scale(0.925);';
-	drag_bounce_timeout = setTimeout(() => {
-		piece.removeAttribute('style');
-		drag_bounce_timeout = undefined;
-	});
+	setTimeout(() => piece.removeAttribute('style'));
 	return true;
 };
 document.addEventListener('mouseup', dragRelease);
@@ -499,10 +618,6 @@ const dragPiece = (e) => {
 	}
 	if (!active_piece) {
 		return false;
-	}
-	const {x, y} = getMousedCell(e);
-	if (x !== active_square.x || y !== active_square.y) {
-		could_select = false;
 	}
 	const rect = active_piece.parentElement.getBoundingClientRect();
 	active_piece.style.cssText = `left: ${e.x - rect.x - 0.5 * rect.width}px;`

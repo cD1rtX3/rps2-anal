@@ -14,10 +14,10 @@
 		fill: #4c4f69;
 	}
 	.red {
-		fill: #e64553;
+		fill: #e6455381;
 	}
 	.blue {
-		fill: #1e66f5;
+		fill: #1e66f581;
 	}
 	@media (prefers-color-scheme: dark) {
 		.crust {
