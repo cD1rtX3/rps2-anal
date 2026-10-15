@@ -127,6 +127,7 @@ body {
 	width: 100%;
 	height: 100%;
 	fill: var(--move-dot);
+	overflow: hidden;
 }
 .dot:hover {
 	background-color: var(--move-dot);
@@ -283,8 +284,9 @@ body {
 	padding: 0 0.25ch;
 	cursor: pointer;
 }
-.current {
+.current.move, .current.variation-move {
 	background-color: var(--surface-2);
+	pointer-events: none;
 }
 .move:hover, .variation-move:hover {
 	background-color: var(--surface-2);

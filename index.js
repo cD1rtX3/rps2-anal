@@ -10,13 +10,13 @@ const BLUE = 0;
 const RED = 4;
 
 // 65 is 'A', and 49 is '1'.
-const getSquareName = (x, y) => String.fromCodePoint(65 + x, 49 + y);
+const getSquareName = (x, y) => String.fromCharCode(65 + x, 49 + y);
 const getNamedSquare = (name) => ({
-	x: name.codePointAt(0) - 65,
-	y: name.codePointAt(1) - 49,
+	x: name.charCodeAt(0) - 65,
+	y: name.charCodeAt(1) - 49,
 });
 
-const startpos = JSON.parse(`[
+const getStartpos = () => JSON.parse(`[
 	[0, 0, 0, 0, 0, 0, 0, 0, 0],
 	[0, 0, 0, 1, 2, 0, 0, 0, 0],
 	[0, 0, 1, 2, 3, 0, 0, 0, 0],
@@ -28,7 +28,7 @@ const startpos = JSON.parse(`[
 	[0, 0, 0, 0, 0, 0, 0, 0, 0]
 ]`);
 /** The current pieces on the board, by row (*y*), then by column (*x*). */
-let board = [...startpos];
+let board = getStartpos();
 let red_to_move = false;
 let current_fullmove = 1;
 let starting_fullmove = 1;
@@ -72,7 +72,7 @@ const getNextID = () => {
 	return id_float64[0];
 };
 
-const piece_letters = ['', 'R', 'P', 'S', '', 'r', 'p', 's'];
+const piece_letters = ['', 'R', 'P', 'S', undefined, 'r', 'p', 's'];
 const getFen = () => {
 	let board_string = '';
 	for (let y = 9; y-- > 0;) {
@@ -128,7 +128,7 @@ let drag_origin_x = 0;
 let drag_origin_y = 0;
 let active_square = {element: null};
 
-const piece_strings = ['', 'rock', 'paper', 'scissors'];
+const piece_strings = [undefined, 'rock', 'paper', 'scissors'];
 const setUpBoard = () => {
 	let board_html = '';
 	// The top of the board is the last row.
@@ -208,10 +208,15 @@ setSide();
 const getNotation = (move, ascii) => getSquareName(move.px, move.py)
 		+ (move.captured ? ascii ? 'x' : '&times;' : ascii ? '-' : '&ndash;&NoBreak;')
 		+ getSquareName(move.tx, move.ty);
+// 97 is 'a'.
+const getMoveUCI = (move) => String.fromCharCode(
+	move.px + 97, move.py + 49,
+	move.tx + 97, move.tx + 49
+);
 
-const navigateToMove = (variation_id, idx) => {
+const navigateToMove = (variation_id, ply) => {
 	let common_ancestor_id = current_variation_id;
-	let variation_common_idx = idx;
+	let variation_common_idx = undefined;
 	let variation_idx_hist;
 	if (current_variation_id !== variation_id) {
 		variation_idx_hist = [];
@@ -245,6 +250,7 @@ const navigateToMove = (variation_id, idx) => {
 		old_from_new = new Uint8Array(81).map((_, i) => i);
 	}
 
+	let current_ply = 2 * current_fullmove + Number(red_to_move) - 3;
 	const stepForward = () => {
 		const item = current_variation[++current_history_idx];
 		if (typeof(item) !== 'object') {
@@ -260,6 +266,7 @@ const navigateToMove = (variation_id, idx) => {
 			current_fullmove++;
 		}
 		red_to_move = !red_to_move;
+		current_ply++;
 	};
 	const stepBackward = () => {
 		const item = current_variation[current_history_idx--];
@@ -276,6 +283,7 @@ const navigateToMove = (variation_id, idx) => {
 			current_fullmove--;
 		}
 		red_to_move = !red_to_move;
+		current_ply--;
 	}
 	while (current_variation_id !== common_ancestor_id) {
 		while (current_history_idx > 0) {
@@ -286,25 +294,43 @@ const navigateToMove = (variation_id, idx) => {
 		current_variation = history_tree.get(current_variation_id);
 		current_history_idx = header.from_idx;
 	}
-	if (current_history_idx < variation_common_idx) {
-		do {
-			stepForward();
-		} while (current_history_idx < variation_common_idx);
-	} else if (current_history_idx > variation_common_idx) {
-		do {
-			stepBackward();
-		} while (current_history_idx > variation_common_idx);
-	}
-	while (current_variation_id !== variation_id) {
-		current_variation_id = current_variation[current_history_idx];
-		current_variation = history_tree.get(current_variation_id);
-		current_history_idx = 0;
-		const target = variation_idx_hist.pop();
-		if (typeof(target) === 'undefined') {
-			throw Error('coarse you fucked up your algorithm');
+	if (typeof(variation_common_idx) === 'undefined') {
+		if (current_ply < ply) {
+			do {
+				stepForward();
+			} while (current_ply < ply);
+		} else if (current_ply > ply) {
+			do {
+				stepBackward();
+			} while (current_ply > ply);
 		}
-		while (current_history_idx < target) {
-			stepForward();
+	} else {
+		if (current_history_idx < variation_common_idx) {
+			do {
+				stepForward();
+			} while (current_history_idx < variation_common_idx);
+		} else if (current_history_idx > variation_common_idx) {
+			do {
+				stepBackward();
+			} while (current_history_idx > variation_common_idx);
+		}
+		while (current_variation_id !== variation_id) {
+			current_variation_id = current_variation[current_history_idx];
+			current_variation = history_tree.get(current_variation_id);
+			current_history_idx = 0;
+			const target = variation_idx_hist.pop();
+			if (typeof(target) === 'undefined') {
+				if (current_variation_id !== variation_id) {
+					throw Error('coarse you fucked up your algorithm');
+				}
+				while (current_ply < ply) {
+					stepForward();
+				}
+				break;
+			}
+			while (current_history_idx < target) {
+				stepForward();
+			}
 		}
 	}
 	// TODO: smoothly animate; highlight last move
@@ -313,6 +339,10 @@ const navigateToMove = (variation_id, idx) => {
 	printMoves();
 }
 
+/** @param {MouseEvent} e */
+const moveCallback = (e) => {
+	navigateToMove(...e.target.id.split(':').map(Number));
+};
 const getVariationHTML = (id, ply, current_ply) => {
 	let moves_html = '<li>'
 	const variation = history_tree.get(id);
@@ -338,7 +368,7 @@ const getVariationHTML = (id, ply, current_ply) => {
 							? 'current '
 							: ''
 				) + 'variation-move"'
-				+ ` id="${ply};${id}"`
+				+ ` id="${id}:${ply}"`
 			+ '>'
 				+ `${(ply >> 1) + 1}${ply & 1 ? '&hellip;' : '.'}&nbsp;`
 				+ getNotation(current, false)
@@ -356,10 +386,6 @@ const printMoves = () => {
 	}
 	let moves_html = '';
 	let have_fullmove_label = false;
-	/*
-	 * This will be negative in the starting position, but that just means
-	 * there are no moves selected.
-	 */
 	const current_ply = 2 * current_fullmove + Number(red_to_move) - 3;
 	let ply = root_variation[0].from_idx;
 	for (let i = 1; i < root_variation.length; i++) {
@@ -392,11 +418,19 @@ const printMoves = () => {
 							? 'current '
 							: ''
 					) + 'move"'
-				+ ` id="${ply};0"`
+				+ ` id="0:${ply}"`
 			+ `>${getNotation(current, false)}</div>`;
 		ply++;
 	}
 	moves_element.innerHTML = moves_html;
+	Array.prototype.forEach.call(
+		document.getElementsByClassName('move'),
+		(el) => el.addEventListener('click', moveCallback)
+	);
+	Array.prototype.forEach.call(
+		document.getElementsByClassName('variation-move'),
+		(el) => el.addEventListener('click', moveCallback)
+	);
 }
 
 /* ----------------------------- Piece movement ----------------------------- */
