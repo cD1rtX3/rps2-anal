@@ -326,6 +326,13 @@ const navigateToMove = (variation_id, idx) => {
 	}
 
 	setUpBoard();
+	const last_move = current_variation[current_history_idx];
+	document.getElementById(
+		getSquareName(last_move.px, last_move.py)
+	).className = 'previous cell';
+	document.getElementById(
+		getSquareName(last_move.tx, last_move.ty)
+	).className = 'previous cell';
 	if (should_animate) {
 		const cell_size
 			= document.getElementsByClassName('cell').item(0).getBoundingClientRect().width;
@@ -350,7 +357,7 @@ const navigateToMove = (variation_id, idx) => {
 
 	const active = document.getElementsByClassName('current').item(0);
 	active.className
-		= active.className.split(' ').map((s) => s === 'current' ? '' : s).join(' ');
+		= active.className.split(' ').filter((v) => v !== 'current').join(' ');
 	document.getElementById(`${variation_id}:${idx}`).className += ' current';
 }
 
