@@ -41,13 +41,12 @@ let rule50 = 0;
  * is the root or the location in the parent this variation is mentioned if it
  * isn't.
  *
- * Each subsequent element of the arrays is either a number or an object. If it
- * is a number, this number is the ID of a variation which may be branched into
- * in place of the next move/variation. If it is an object, it is in the form
- * `{px, py, tx, ty, captured, rule50_before}`, where `px` and `py` are the
- * coörds of the start square, `tx` and `ty` are the coörds of the target
- * square, `captured` is the piece which was captured or zero if no piece was
- * captured, and `rule50_before` is the 100-move rule value before this move.
+ * Each subsequent element of the arrays is an object in the form `{px, py, tx,
+ * ty, captured, rule50_before, variations}`, where `px` and `py` are the coörds
+ * of the start square, `tx` and `ty` are the coörds of the target square,
+ * `captured` is the piece which was captured or zero if no piece was captured,
+ * `rule50_before` is the 100-move rule value before this move, and
+ * `variations`, if non-null…
  */
 const history_tree = new Map(JSON.parse(
 	'[[0, [{"from_idx": 0, "depth": 0}]]]'
@@ -213,32 +212,37 @@ const getMoveUCI = (move) => String.fromCharCode(
 	move.px + 97, move.py + 49,
 	move.tx + 97, move.tx + 49
 );
+const getMoveNumeric
+	= (move) => move.px | (move.py << 4) | (move.tx << 8) | (move.ty << 12);
 
-const navigateToMove = (variation_id, ply) => {
+const navigateToMove = (variation_id, idx) => {
 	let common_ancestor_id = current_variation_id;
-	let variation_common_idx = undefined;
+	let variation_common_idx = idx;
 	let variation_idx_hist;
+	let variation_root_hist;
 	if (current_variation_id !== variation_id) {
 		variation_idx_hist = [];
+		variation_root_hist = [];
 		let variation_ancestor_id = variation_id;
-		let current_common_idx = current_history_idx;
 		let c0 = history_tree.get(common_ancestor_id)[0];
-		let v0 = history_tree.get(variation_ancestor_id)[0];
+		let v = history_tree.get(variation_ancestor_id);
+		let v0 = v[0];
 		while (common_ancestor_id !== variation_ancestor_id) {
 			if (!c0.depth && !v0.depth) {
 				throw Error('Move history tree has two roots!');
 			}
 			if (c0.depth >= v0.depth) {
 				common_ancestor_id = c0.from;
-				current_common_idx = c0.from_idx;
 				c0 = history_tree.get(common_ancestor_id)[0];
 			}
 			// If the two were equal, this will now be true.
 			if (c0.depth < v0.depth) {
 				variation_ancestor_id = v0.from;
 				variation_idx_hist.push(variation_common_idx);
+				variation_root_hist.push(getMoveNumeric(v[1]));
 				variation_common_idx = v0.from_idx;
-				v0 = history_tree.get(variation_ancestor_id)[0];
+				v = history_tree.get(variation_ancestor_id);
+				v0 = v[0];
 			}
 		}
 	}
@@ -250,7 +254,6 @@ const navigateToMove = (variation_id, ply) => {
 		old_from_new = new Int8Array(81).map((_, i) => board[Math.floor(i / 9)][i % 9] ? i : -1);
 	}
 
-	let current_ply = 2 * current_fullmove + Number(red_to_move) - 3;
 	const stepForward = () => {
 		const item = current_variation[++current_history_idx];
 		if (typeof(item) !== 'object') {
@@ -268,7 +271,6 @@ const navigateToMove = (variation_id, ply) => {
 			current_fullmove++;
 		}
 		red_to_move = !red_to_move;
-		current_ply++;
 	};
 	const stepBackward = () => {
 		const item = current_variation[current_history_idx--];
@@ -287,7 +289,6 @@ const navigateToMove = (variation_id, ply) => {
 			current_fullmove--;
 		}
 		red_to_move = !red_to_move;
-		current_ply--;
 	}
 	while (current_variation_id !== common_ancestor_id) {
 		while (current_history_idx > 0) {
@@ -298,43 +299,29 @@ const navigateToMove = (variation_id, ply) => {
 		current_variation = history_tree.get(current_variation_id);
 		current_history_idx = header.from_idx;
 	}
-	if (typeof(variation_common_idx) === 'undefined') {
-		if (current_ply < ply) {
-			do {
-				stepForward();
-			} while (current_ply < ply);
-		} else if (current_ply > ply) {
-			do {
-				stepBackward();
-			} while (current_ply > ply);
-		}
-	} else {
-		if (current_history_idx < variation_common_idx) {
-			do {
-				stepForward();
-			} while (current_history_idx < variation_common_idx);
-		} else if (current_history_idx > variation_common_idx) {
-			do {
-				stepBackward();
-			} while (current_history_idx > variation_common_idx);
-		}
-		while (current_variation_id !== variation_id) {
-			current_variation_id = current_variation[current_history_idx];
-			current_variation = history_tree.get(current_variation_id);
-			current_history_idx = 0;
-			const target = variation_idx_hist.pop();
-			if (typeof(target) === 'undefined') {
-				if (current_variation_id !== variation_id) {
-					throw Error('coarse you fucked up your algorithm');
-				}
-				while (current_ply < ply) {
-					stepForward();
-				}
+	if (current_history_idx < variation_common_idx) {
+		do {
+			stepForward();
+		} while (current_history_idx < variation_common_idx);
+	} else if (current_history_idx > variation_common_idx) {
+		do {
+			stepBackward();
+		} while (current_history_idx > variation_common_idx);
+	}
+	while (current_variation_id !== variation_id) {
+		const variations = current_variation[current_history_idx].variations;
+		const target_root = variation_root_hist.pop();
+		for (let i = 0; i < variations.length; i++) {
+			if (variations[i][0] === target_root) {
+				current_variation_id = variations[i][1];
 				break;
 			}
-			while (current_history_idx < target) {
-				stepForward();
-			}
+		}
+		current_variation = history_tree.get(current_variation_id);
+		current_history_idx = 0;
+		const target = variation_idx_hist.pop();
+		while (current_history_idx < target) {
+			stepForward();
 		}
 	}
 
@@ -364,7 +351,7 @@ const navigateToMove = (variation_id, ply) => {
 	const active = document.getElementsByClassName('current').item(0);
 	active.className
 		= active.className.split(' ').map((s) => s === 'current' ? '' : s).join(' ');
-	document.getElementById(`${variation_id}:${ply}`).className += ' current';
+	document.getElementById(`${variation_id}:${idx}`).className += ' current';
 }
 
 /** @param {MouseEvent} e */
@@ -376,19 +363,6 @@ const getVariationHTML = (id, ply, current_ply) => {
 	const variation = history_tree.get(id);
 	for (let i = 1; i < variation.length; i++) {
 		let current = variation[i];
-		if (typeof(current) == 'number') {
-			moves_html += '<ul class="variation">';
-			do {
-				moves_html += getVariationHTML(current, ply, current_ply);
-			} while (typeof(current = variation[++i]) === 'number');
-			moves_html += "</ul>"
-			if (i === variation.length) {
-				break;
-			}
-		}
-		if (typeof(current) !== 'object') {
-			throw Error(`Got bad move: ${current}.`);
-		}
 		moves_html
 			+= '<span'
 				+ ' class="variation-move' + (
@@ -396,12 +370,23 @@ const getVariationHTML = (id, ply, current_ply) => {
 							? ' current'
 							: ''
 				) + '"'
-				+ ` id="${id}:${ply}"`
+				+ ` id="${id}:${i}"`
 			+ '>'
 				+ `${(ply >> 1) + 1}${ply & 1 ? '&hellip;' : '.'}&nbsp;`
 				+ getNotation(current, false)
 			+ '</span>&ZeroWidthSpace;';
 		ply++;
+		if (current.variations) {
+			moves_html += '<ul class="variation">';
+			for (const v of current.variations) {
+				moves_html += getVariationHTML(v[1], ply, current_ply);
+			}
+			moves_html += '</ul>';
+			if (i === root_variation.length) {
+				break;
+			}
+			have_fullmove_label = false;
+		}
 	}
 	return moves_html;
 }
@@ -418,20 +403,6 @@ const printMoves = () => {
 	let ply = root_variation[0].from_idx;
 	for (let i = 1; i < root_variation.length; i++) {
 		let current = root_variation[i];
-		if (typeof(current) === 'number') {
-			moves_html += '<div class="variation-box"><ul class="variation">';
-			do {
-				moves_html += getVariationHTML(current, ply, current_ply);
-			} while (typeof(current = root_variation[++i]) === 'number');
-			moves_html += "</ul></div>"
-			if (i === root_variation.length) {
-				break;
-			}
-			have_fullmove_label = false;
-		}
-		if (typeof(current) !== 'object') {
-			throw Error(`Got bad move: ${current}.`);
-		}
 		if (!(ply & 1) || !have_fullmove_label) {
 			moves_html += `<div class="move-number">${(ply >> 1) + 1}</div>`;
 			if (ply & 1) {
@@ -446,9 +417,20 @@ const printMoves = () => {
 							? ' current'
 							: ''
 				) + '"'
-				+ ` id="0:${ply}"`
+				+ ` id="0:${i}"`
 			+ `>${getNotation(current, false)}</div>`;
 		ply++;
+		if (current.variations) {
+			moves_html += '<div class="variation-box"><ul class="variation">';
+			for (const v of current.variations) {
+				moves_html += getVariationHTML(v[1], ply, current_ply);
+			}
+			moves_html += '</ul></div>';
+			if (i === root_variation.length) {
+				break;
+			}
+			have_fullmove_label = false;
+		}
 	}
 	moves_element.innerHTML = moves_html;
 	Array.prototype.forEach.call(
@@ -553,22 +535,44 @@ const movePiece = (px, py, tx, ty, from_drag) => {
 	board[ty][tx] = piece;
 	current_fullmove += Number(red_to_move);
 	red_to_move = !red_to_move;
-	current_history_idx++;
 	const move = {
 		px: px, py: py,
 		tx: tx, ty: ty,
 		captured: target_piece,
 		rule50_before: rule50,
+		variations: null,
 	};
 	rule50 = target_piece ? 0 : rule50 + 1;
-	if (current_history_idx === current_variation.length) {
-		current_variation[current_history_idx] = move;
-	} else {
-		while (typeof(current_variation[current_history_idx]) === 'number') {
+	put_move: do {
+		// why doesn't javascript have goto
+		if (current_history_idx === current_variation.length - 1) {
+			current_variation[++current_history_idx] = move;
+			break put_move;
+		}
+		const next = current_variation[current_history_idx + 1];
+		if (next.px === px && next.py === py && next.tx === tx && next.ty === ty) {
 			current_history_idx++;
+			break put_move;
+		}
+		const prev = current_variation[current_history_idx];
+		const move_numeric = getMoveNumeric(move);
+		let prev_variations;
+		if (!prev.variations) {
+			prev.variations = [];
+			prev_variations = prev.variations;
+		} else {
+			prev_variations = prev.variations;
+			for (let i = 0; i < prev_variations.length; i++) {
+				if (prev_variations[i][0] !== move_numeric) {
+					continue;
+				}
+				current_variation_id = prev_variations[i][1];
+				current_variation = history_tree.get(current_variation_id);
+				current_history_idx = 1;
+				break put_move;
+			}
 		}
 		const id = getNextID();
-		current_variation.splice(current_history_idx, 0, id);
 		history_tree.set(id, [
 			{
 				from: current_variation_id,
@@ -577,16 +581,11 @@ const movePiece = (px, py, tx, ty, from_drag) => {
 			},
 			move,
 		]);
-		for (let i = current_history_idx + 1; i < current_variation.length; i++) {
-			const item = current_variation[current_history_idx];
-			if (typeof(item) === 'number') {
-				history_tree.get(item).from_idx++;
-			}
-		}
+		prev.variations.push([move_numeric, id]);
 		current_variation = history_tree.get(id);
 		current_variation_id = id;
 		current_history_idx = 1;
-	}
+	} while (false);
 	// TODO: immediate mode garbage
 	printMoves();
 
