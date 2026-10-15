@@ -271,20 +271,20 @@ body {
 }
 .variation {
 	list-style-type: '\251c';
-	padding-inline-start: 1em;
+	padding-inline-start: 0.85em;
 	margin: 0;
 }
 .variation > li {
-	padding-inline-start: 0.25ch;
+	padding-inline-start: 0.15em;
 }
 .variation > li:last-child {
 	list-style-type: '\2514';
 }
 .variation-move {
-	padding: 0 0.25ch;
+	padding: 0 0.25em;
 	cursor: pointer;
 }
-.current.move, .current.variation-move {
+.current {
 	background-color: var(--surface-2);
 	pointer-events: none;
 }
@@ -373,7 +373,7 @@ body {
 
 @media not (prefers-reduced-motion) {
 	.piece {
-		transition: transform 0.2s var(--quad-out);
+		transition: transform 0.2s var(--quad-out), opacity 0.2s linear;
 	}
 	.piece[active=active] {
 		transition: none;

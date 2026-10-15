@@ -247,7 +247,7 @@ const navigateToMove = (variation_id, ply) => {
 	// In order to animate, we need to know where the pieces came from.
 	let old_from_new;
 	if (should_animate) {
-		old_from_new = new Uint8Array(81).map((_, i) => i);
+		old_from_new = new Int8Array(81).map((_, i) => board[Math.floor(i / 9)][i % 9] ? i : -1);
 	}
 
 	let current_ply = 2 * current_fullmove + Number(red_to_move) - 3;
@@ -257,7 +257,9 @@ const navigateToMove = (variation_id, ply) => {
 			return;
 		}
 		if (should_animate) {
-			old_from_new[9 * item.ty + item.tx] = old_from_new[9 * item.py + item.px];
+			const old = 9 * item.py + item.px;
+			old_from_new[9 * item.ty + item.tx] = old_from_new[old];
+			old_from_new[old] = -1;
 		}
 		rule50 = board[item.ty][item.tx] ? 0 : rule50 + 1;
 		board[item.ty][item.tx] = board[item.py][item.px];
@@ -274,7 +276,9 @@ const navigateToMove = (variation_id, ply) => {
 			return;
 		}
 		if (should_animate) {
-			old_from_new[9 * item.py + item.px] = old_from_new[9 * item.ty + item.tx];
+			const old = 9 * item.ty + item.tx;
+			old_from_new[9 * item.py + item.px] = old_from_new[old];
+			old_from_new[old] = -1;
 		}
 		board[item.py][item.px] = board[item.ty][item.tx];
 		board[item.ty][item.tx] = item.captured;
@@ -333,10 +337,34 @@ const navigateToMove = (variation_id, ply) => {
 			}
 		}
 	}
-	// TODO: smoothly animate; highlight last move
+
 	setUpBoard();
-	// TODO: immediate mode garbage
-	printMoves();
+	if (should_animate) {
+		const cell_size
+			= document.getElementsByClassName('cell').item(0).getBoundingClientRect().width;
+		Array.prototype.forEach.call(document.getElementsByClassName('piece'), (el) => {
+			const {x, y} = getNamedSquare(el.parentElement.id);
+			const new_pos = 9 * y + x;
+			const old_pos = old_from_new[new_pos];
+			if (old_pos !== -1) {
+				if (old_pos === new_pos) {
+					return;
+				}
+				const off_x = cell_size * (old_pos % 9 - x);
+				const off_y = cell_size * (y - Math.floor(old_pos / 9));
+				el.style.cssText
+					= `transition: none; transform: translateX(${off_x}px) translateY(${off_y}px);`;
+			} else {
+				el.style.cssText = `transition: none; opacity: 0%;`;
+			}
+			setTimeout(() => el.removeAttribute('style'));
+		});
+	}
+
+	const active = document.getElementsByClassName('current').item(0);
+	active.className
+		= active.className.split(' ').map((s) => s === 'current' ? '' : s).join(' ');
+	document.getElementById(`${variation_id}:${ply}`).className += ' current';
 }
 
 /** @param {MouseEvent} e */
@@ -363,11 +391,11 @@ const getVariationHTML = (id, ply, current_ply) => {
 		}
 		moves_html
 			+= '<span'
-				+ ' class="' + (
+				+ ' class="variation-move' + (
 					current_variation_id === id && ply === current_ply
-							? 'current '
+							? ' current'
 							: ''
-				) + 'variation-move"'
+				) + '"'
 				+ ` id="${id}:${ply}"`
 			+ '>'
 				+ `${(ply >> 1) + 1}${ply & 1 ? '&hellip;' : '.'}&nbsp;`
@@ -413,11 +441,11 @@ const printMoves = () => {
 		}
 		moves_html
 			+= '<div'
-				+ ' class="' + (
-						current_variation_id === 0 && ply === current_ply
-							? 'current '
+				+ ' class="move' + (
+					current_variation_id === 0 && ply === current_ply
+							? ' current'
 							: ''
-					) + 'move"'
+				) + '"'
 				+ ` id="0:${ply}"`
 			+ `>${getNotation(current, false)}</div>`;
 		ply++;
