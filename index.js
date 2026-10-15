@@ -382,10 +382,9 @@ const getVariationHTML = (id, ply, current_ply) => {
 				moves_html += getVariationHTML(v[1], ply, current_ply);
 			}
 			moves_html += '</ul>';
-			if (i === root_variation.length) {
+			if (i === variation.length) {
 				break;
 			}
-			have_fullmove_label = false;
 		}
 	}
 	return moves_html;
