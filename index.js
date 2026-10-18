@@ -376,6 +376,12 @@ const deleteFromHere = () => {
 		sel_move.variation_id,
 		sel_move.idx
 	);
+	if (typeof(sel_move.variation[sel_move.idx - 1].variations) !== 'undefined') {
+		sel_move.variation_id = sel_move.variation[sel_move.idx - 1].variations[0][1];
+		sel_move.variation = move_history.get(sel_move.variation_id);
+		sel_move.idx = 1;
+		promoteVariation();
+	}
 	printMoves();
 	clearCurrentCtxmenu();
 };
