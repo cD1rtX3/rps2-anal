@@ -1,6 +1,7 @@
+const preventDefault = (e) => e.preventDefault();
 document.getElementById('board').addEventListener(
 	'contextmenu',
-	(e) => e.preventDefault()
+	preventDefault
 );
 
 const ROCK = 1;
@@ -33,26 +34,32 @@ let red_to_move = false;
 let current_fullmove = 1;
 let starting_fullmove = 1;
 let rule50 = 0;
+let adjudication;
 /**
- * A map from numeric variation IDs to arrays of moves. The first element of
+ * A map from numeric variation IDs to arrays of moves. The zeroth element of
  * each array is an object in the form `{depth, from, from_idx}`, where `depth`
- * is the node's depth, `from` is the ID of the parent (or `undefined` for the
- * root), and `from_idx` is the ply number of the starting position if the node
- * is the root or the location in the parent this variation is mentioned if it
- * isn't.
+ * is the node's depth, `from` is the ID of the parent (or `undefined` if there
+ * is none), and `from_idx` is the ply number of the starting position if the
+ * node is the root or the location in the parent this variation is mentioned if
+ * it isn't.
  *
  * Each subsequent element of the arrays is an object in the form `{px, py, tx,
- * ty, captured, rule50_before, variations}`, where `px` and `py` are the coörds
+ * ty, captured, rule50_before}`, where `px` and `py` are the coörds
  * of the start square, `tx` and `ty` are the coörds of the target square,
  * `captured` is the piece which was captured or zero if no piece was captured,
- * `rule50_before` is the 100-move rule value before this move, and
- * `variations`, if non-null…
+ * and `rule50_before` is the 100-move rule value before this move.
+ *
+ * Each element of each move array, including the zeroth element, may
+ * additionally have a member called `variations`, which, if present, is a list
+ * of pairs `[move, id]` of variations which can be branched into instead of the
+ * next move, where `move` is the numeric form of the played move, and `id` is
+ * the id of the variation to branch into.
  */
-const history_tree = new Map(JSON.parse(
+const move_history = new Map(JSON.parse(
 	'[[0, [{"from_idx": 0, "depth": 0}]]]'
 ));
 /** A reference to the variation we are in. */
-let current_variation = history_tree.get(0);
+let current_variation = move_history.get(0);
 /** The ID of the variation we are in. */
 let current_variation_id = 0;
 /** The index of the previous move in the current variation. */
@@ -158,15 +165,15 @@ const setUpBoard = () => {
 	Array.prototype.forEach.call(document.getElementsByClassName('cell'), (el) => {
 		el.addEventListener('click', (e) => {
 			if (e.button !== 0 || active_piece || !active_square.clicked) {
-				return false;
+				return;
 			}
 			const {x: tx, y: ty} = getNamedSquare(el.id);
 			if (tx < 0 || tx > 8 || ty < 0 || ty > 8) {
-				return false;
+				return;
 			}
 			const {x: px, y: py} = active_square;
 			if (px === tx && py === ty) {
-				return false;
+				return;
 			}
 			clearActiveSquare();
 			movePiece(px, py, tx, ty, false);
@@ -175,12 +182,12 @@ const setUpBoard = () => {
 	Array.prototype.forEach.call(document.getElementsByClassName('piece'), (el) => {
 		el.addEventListener('mousedown', (e) => {
 			if (e.button !== 0) {
-				return false;
+				return;
 			}
 			const parent = el.parentElement;
 			const {x, y} = getNamedSquare(parent.id);
 			if (!(board[y][x] & 4) === red_to_move) {
-				return false;
+				return;
 			}
 			if (active_square.element !== parent) {
 				active_square.element?.removeAttribute('active');
@@ -202,6 +209,273 @@ const setUpBoard = () => {
 setUpBoard();
 setSide();
 
+/* ------------------------------ Context menu ------------------------------ */
+
+const cursor_anchor = document.getElementById('cursor-anchor');
+/** @param {PointerEvent} e */
+const updateCursorAnchor = (e) => {
+	cursor_anchor.style.cssText = `left: ${e.clientX}px; top: ${e.clientY}px;`;
+};
+
+const sel_move = {};
+
+let current_ctxmenu = null;
+const clearCurrentCtxmenu = () => {
+	sel_move.variation = undefined;
+	sel_move.variation_id = undefined;
+	sel_move.idx = undefined;
+	if (!current_ctxmenu) {
+		return;
+	}
+	current_ctxmenu.removeAttribute('style');
+	current_ctxmenu = null;
+};
+document.addEventListener('mousedown', (e) => {
+	if (e.button !== 0) {
+		return;
+	}
+	clearCurrentCtxmenu();
+});
+
+const moves_ctxmenu = document.getElementById('moves-ctxmenu');
+const m_force_var = document.getElementById('m-force-var');
+const m_del       = document.getElementById('m-del');
+
+const vmoves_ctxmenu = document.getElementById('vmoves-ctxmenu');
+const vm_promote = document.getElementById('vm-promote');
+const vm_to_main = document.getElementById('vm-to-main');
+const vm_top     = document.getElementById('vm-top');
+const vm_up      = document.getElementById('vm-up');
+const vm_down    = document.getElementById('vm-down');
+const vm_bottom  = document.getElementById('vm-bottom');
+const vm_del     = document.getElementById('vm-del');
+
+const menuCallback = (menu) => (e) => {
+	if (!CSS.supports('position-anchor', 'auto')) {
+		return;
+	}
+	e.preventDefault();
+	clearCurrentCtxmenu();
+	current_ctxmenu = menu;
+	updateCursorAnchor(e);
+	prepare_menu: do {
+		if (menu !== moves_ctxmenu && menu !== vmoves_ctxmenu) {
+			break prepare_menu;
+		}
+		(
+			{[0]: sel_move.variation_id, [1]: sel_move.idx}
+				= e.target.id.split(':').map(Number)
+		);
+		sel_move.variation = move_history.get(sel_move.variation_id);
+		if (menu !== vmoves_ctxmenu) {
+			break prepare_menu;
+		}
+		const header = sel_move.variation[0];
+		if (header.depth < 2) {
+			vm_to_main.style.cssText = 'display: none;';
+		} else {
+			vm_to_main.removeAttribute('style');
+		}
+		const siblings = move_history.get(header.from)[header.from_idx].variations;
+		const sibling_count = siblings.length;
+		if (sibling_count <= 1) {
+			vm_top.style.cssText
+				= vm_up.style.cssText
+				= vm_down.style.cssText
+				= vm_bottom.style.cssText
+				= 'display: none;';
+			break prepare_menu;
+		}
+		let sibling_idx = 0;
+		for (; siblings[sibling_idx][1] !== sel_move.variation_id; sibling_idx++);
+		if (sibling_idx <= 1) {
+			vm_top.style.cssText = 'display: none;';
+		} else {
+			vm_top.removeAttribute('style');
+		}
+		if (sibling_idx == 0) {
+			vm_up.style.cssText = 'display: none;';
+		} else {
+			vm_up.removeAttribute('style');
+		}
+		if (sibling_idx == sibling_count - 1) {
+			vm_down.style.cssText = 'display: none;';
+		} else {
+			vm_down.removeAttribute('style');
+		}
+		if (sibling_idx >= sibling_count - 2) {
+			vm_bottom.style.cssText = 'display: none;';
+		} else {
+			vm_bottom.removeAttribute('style');
+		}
+	} while (false);
+	menu.style.cssText = 'display: block;';
+};
+const stopPropagation = (e) => e.stopPropagation();
+
+const freeVariationSince = (id, idx, base_id, base_idx) => {
+	if (id === current_variation_id) {
+		// THIS PLACE 'BOUT TO—
+		if (id !== base_id || base_idx <= current_history_idx) {
+			navigateToMove(base_id, base_idx - 1);
+		}
+	}
+	const variation = move_history.get(id);
+	for (let i = variation.length; i-- > idx;) {
+		const subvars = variation[i].variations;
+		if (!subvars) {
+			continue;
+		}
+		for (let j = subvars.length; j-- > 0;) {
+			freeVariationSince(subvars[j][1], 1, base_id, base_idx);
+		}
+	}
+	if (id !== 0 && idx === 1) {
+		const parent = move_history.get(variation[0].from)[variation[0].from_idx];
+		const siblings = parent.variations;
+		const N = siblings.length;
+		for (let i = 0; i < N; i++) {
+			if (siblings[i][1] === id) {
+				siblings.splice(i, 1);
+				break;
+			}
+		}
+		if (N === 1) {
+			parent.variations = undefined;
+		}
+		move_history.delete(id);
+		return;
+	}
+	variation.length = idx;
+};
+const deleteFromHere = () => {
+	freeVariationSince(
+		sel_move.variation_id,
+		sel_move.idx,
+		sel_move.variation_id,
+		sel_move.idx
+	);
+	printMoves();
+	clearCurrentCtxmenu();
+};
+m_del.addEventListener('mouseup', deleteFromHere);
+vm_del.addEventListener('mouseup', deleteFromHere);
+
+moves_ctxmenu.addEventListener('contextmenu', preventDefault);
+moves_ctxmenu.addEventListener('mousedown', stopPropagation);
+m_force_var.addEventListener('mouseup', () => {
+	const id = getNextID();
+	const prev = sel_move.variation[sel_move.idx - 1];
+	if (typeof(prev.variations) === 'undefined') {
+		prev.variations = [];
+	}
+	prev.variations.push([getMoveNumeric(sel_move.variation[sel_move.idx]), id]);
+	move_history.set(id, [
+		{
+			from: sel_move.variation_id,
+			from_idx: sel_move.idx - 1,
+			depth: sel_move.variation[0].depth + 1,
+		},
+		...sel_move.variation.splice(sel_move.idx)
+	]);
+	// Nothing should have actually changed in the position.
+	if (sel_move.variation_id === current_variation_id) {
+		current_variation_id = id;
+		current_variation = move_history.get(id);
+		current_history_idx -= sel_move.idx - 1;
+	}
+	printMoves();
+	clearCurrentCtxmenu();
+});
+
+vmoves_ctxmenu.addEventListener('contextmenu', preventDefault);
+vmoves_ctxmenu.addEventListener('mousedown', stopPropagation);
+const promoteVariation = () => {
+	const header = sel_move.variation[0];
+	const from = header.from;
+	const parent = move_history.get(from);
+	const from_idx = header.from_idx;
+	const our_moves = sel_move.variation.splice(1);
+	our_moves.forEach((v) => v.variations?.forEach((w) => {
+		const w_header = move_history.get(w[1])[0];
+		w_header.from = from;
+		w_header.from_idx += from_idx;
+	}));
+	if (parent.length > from_idx + 1) {
+		const parent_moves = parent.splice(from_idx + 1);
+		parent_moves.forEach((v) => v.variations?.forEach((w) => {
+			const w_header = move_history.get(w[1])[0];
+			w_header.from = sel_move.variation_id;
+			w_header.from_idx -= from_idx;
+		}));
+		parent[from_idx].variations.find((v) => v[1] === sel_move.variation_id)[0]
+			= getMoveNumeric(parent_moves[0]);
+		sel_move.variation.push(...parent_moves);
+	} else {
+		const siblings = parent[from_idx].variations;
+		siblings.splice(siblings.findIndex((v) => v[1] === sel_move.variation_id), 1);
+		move_history.delete(sel_move.variation_id);
+	}
+	parent.push(...our_moves);
+	if (current_variation_id === sel_move.variation_id) {
+		current_variation_id = from;
+		current_variation = parent;
+		current_history_idx += from_idx;
+	} else if (current_variation_id === from
+			&& current_history_idx > from_idx) {
+		current_variation_id = sel_move.variation_id;
+		current_variation = sel_move.variation;
+		current_history_idx -= from_idx;
+	}
+	printMoves();
+	sel_move.variation_id = from;
+	sel_move.variation = parent;
+	sel_move.idx += from_idx;
+};
+vm_promote.addEventListener('mouseup', () => {
+	promoteVariation();
+	clearCurrentCtxmenu();
+});
+vm_to_main.addEventListener('mouseup', () => {
+	while (sel_move.variation_id !== 0) {
+		promoteVariation();
+	}
+	clearCurrentCtxmenu();
+});
+const moveVariation = (e) => {
+	const header = sel_move.variation[0];
+	const siblings = move_history.get(header.from)[header.from_idx].variations;
+	const sel_idx = siblings.findIndex((v) => v[1] === sel_move.variation_id);
+	const item = siblings[sel_idx];
+	if (e.target === vm_top) {
+		siblings.splice(1, sel_idx, ...siblings.slice(0, sel_idx));
+		siblings[0] = item;
+	} else if (e.target === vm_up) {
+		if (sel_idx === 0) {
+			throw Error('Tried to move variation up from the top.');
+		}
+		siblings[sel_idx] = siblings[sel_idx - 1];
+		siblings[sel_idx - 1] = item;
+	} else if (e.target === vm_down) {
+		if (sel_idx === siblings.length - 1) {
+			throw Error('Tried to move variation down from the bottom.');
+		}
+		siblings[sel_idx] = siblings[sel_idx + 1];
+		siblings[sel_idx + 1] = item;
+	} else if (e.target === vm_bottom) {
+		siblings.splice(sel_idx, 1);
+		siblings.push(item);
+	} else {
+		throw Error('moveVariation called with nowhere to move.');
+	}
+	printMoves();
+	clearCurrentCtxmenu();
+};
+vm_top.addEventListener('mouseup', moveVariation);
+vm_up.addEventListener('mouseup', moveVariation);
+vm_down.addEventListener('mouseup', moveVariation);
+vm_bottom.addEventListener('mouseup', moveVariation);
+
 /* ------------------------------ Move history ------------------------------ */
 
 const getNotation = (move, ascii) => getSquareName(move.px, move.py)
@@ -216,16 +490,23 @@ const getMoveNumeric
 	= (move) => move.px | (move.py << 4) | (move.tx << 8) | (move.ty << 12);
 
 const navigateToMove = (variation_id, idx) => {
+	if (variation_id !== 0 && idx === 0) {
+		const header = move_history.get(variation_id)[0];
+		variation_id = header.from;
+		idx = header.from_idx;
+	}
 	let common_ancestor_id = current_variation_id;
 	let variation_common_idx = idx;
 	let variation_idx_hist;
-	let variation_root_hist;
-	if (current_variation_id !== variation_id) {
+	let variation_id_hist;
+	if (variation_id === 0) {
+		common_ancestor_id = 0;
+	} else if (current_variation_id !== variation_id) {
 		variation_idx_hist = [];
-		variation_root_hist = [];
+		variation_id_hist = [];
 		let variation_ancestor_id = variation_id;
-		let c0 = history_tree.get(common_ancestor_id)[0];
-		let v = history_tree.get(variation_ancestor_id);
+		let c0 = move_history.get(common_ancestor_id)[0];
+		let v = move_history.get(variation_ancestor_id);
 		let v0 = v[0];
 		while (common_ancestor_id !== variation_ancestor_id) {
 			if (!c0.depth && !v0.depth) {
@@ -233,15 +514,15 @@ const navigateToMove = (variation_id, idx) => {
 			}
 			if (c0.depth >= v0.depth) {
 				common_ancestor_id = c0.from;
-				c0 = history_tree.get(common_ancestor_id)[0];
+				c0 = move_history.get(common_ancestor_id)[0];
 			}
 			// If the two were equal, this will now be true.
 			if (c0.depth < v0.depth) {
+				variation_id_hist.push(variation_ancestor_id);
 				variation_ancestor_id = v0.from;
 				variation_idx_hist.push(variation_common_idx);
-				variation_root_hist.push(getMoveNumeric(v[1]));
 				variation_common_idx = v0.from_idx;
-				v = history_tree.get(variation_ancestor_id);
+				v = move_history.get(variation_ancestor_id);
 				v0 = v[0];
 			}
 		}
@@ -296,7 +577,7 @@ const navigateToMove = (variation_id, idx) => {
 		}
 		const header = current_variation[0];
 		current_variation_id = header.from;
-		current_variation = history_tree.get(current_variation_id);
+		current_variation = move_history.get(current_variation_id);
 		current_history_idx = header.from_idx;
 	}
 	if (current_history_idx < variation_common_idx) {
@@ -309,15 +590,11 @@ const navigateToMove = (variation_id, idx) => {
 		} while (current_history_idx > variation_common_idx);
 	}
 	while (current_variation_id !== variation_id) {
-		const variations = current_variation[current_history_idx].variations;
-		const target_root = variation_root_hist.pop();
-		for (let i = 0; i < variations.length; i++) {
-			if (variations[i][0] === target_root) {
-				current_variation_id = variations[i][1];
-				break;
-			}
+		if (variation_id_hist.length === 0) {
+			throw Error('No more nodes to descend, but we haven\'t hit our target.');
 		}
-		current_variation = history_tree.get(current_variation_id);
+		current_variation_id = variation_id_hist.pop();
+		current_variation = move_history.get(current_variation_id);
 		current_history_idx = 0;
 		const target = variation_idx_hist.pop();
 		while (current_history_idx < target) {
@@ -326,13 +603,6 @@ const navigateToMove = (variation_id, idx) => {
 	}
 
 	setUpBoard();
-	const last_move = current_variation[current_history_idx];
-	document.getElementById(
-		getSquareName(last_move.px, last_move.py)
-	).className = 'previous cell';
-	document.getElementById(
-		getSquareName(last_move.tx, last_move.ty)
-	).className = 'previous cell';
 	if (should_animate) {
 		const cell_size
 			= document.getElementsByClassName('cell').item(0).getBoundingClientRect().width;
@@ -356,24 +626,35 @@ const navigateToMove = (variation_id, idx) => {
 	}
 
 	const active = document.getElementsByClassName('current').item(0);
-	active.className
-		= active.className.split(' ').filter((v) => v !== 'current').join(' ');
-	document.getElementById(`${variation_id}:${idx}`).className += ' current';
+	if (active) {
+		active.className
+			= active.className.split(' ').filter((v) => v !== 'current').join(' ');
+	}
+	if (idx > 0) {
+		document.getElementById(`${variation_id}:${idx}`).className += ' current';
+		const last_move = current_variation[current_history_idx];
+		document.getElementById(
+			getSquareName(last_move.px, last_move.py)
+		).className = 'previous cell';
+		document.getElementById(
+			getSquareName(last_move.tx, last_move.ty)
+		).className = 'previous cell';
+	}
 }
 
 /** @param {MouseEvent} e */
 const moveCallback = (e) => {
 	navigateToMove(...e.target.id.split(':').map(Number));
 };
-const getVariationHTML = (id, ply, current_ply) => {
+const getVariationHTML = (id, ply) => {
 	let moves_html = '<li>'
-	const variation = history_tree.get(id);
+	const variation = move_history.get(id);
 	for (let i = 1; i < variation.length; i++) {
 		let current = variation[i];
 		moves_html
 			+= '<span'
 				+ ' class="variation-move' + (
-					current_variation_id === id && ply === current_ply
+					current_variation_id === id && i === current_history_idx
 							? ' current'
 							: ''
 				) + '"'
@@ -386,7 +667,7 @@ const getVariationHTML = (id, ply, current_ply) => {
 		if (current.variations) {
 			moves_html += '<ul class="variation">';
 			for (const v of current.variations) {
-				moves_html += getVariationHTML(v[1], ply, current_ply);
+				moves_html += getVariationHTML(v[1], ply);
 			}
 			moves_html += '</ul>';
 			if (i === variation.length) {
@@ -395,20 +676,25 @@ const getVariationHTML = (id, ply, current_ply) => {
 		}
 	}
 	return moves_html;
-}
+};
 const moves_element = document.getElementById('moves');
+moves_element.addEventListener('contextmenu', preventDefault);
 const printMoves = () => {
-	const root_variation = history_tree.get(0);
-	if (root_variation.length < 2) {
-		moves_element.innerHTML = '';
-		return;
-	}
+	const root_variation = move_history.get(0);
 	let moves_html = '';
+	let current = root_variation[0];
+	let ply = current.from_idx;
+	if (current.variations) {
+		moves_html
+			+= '<div class="variation-box" style="margin-top: 0;"><ul class="variation">';
+		for (const v of current.variations) {
+			moves_html += getVariationHTML(v[1], ply);
+		}
+		moves_html += '</ul></div>';
+	}
 	let have_fullmove_label = false;
-	const current_ply = 2 * current_fullmove + Number(red_to_move) - 3;
-	let ply = root_variation[0].from_idx;
 	for (let i = 1; i < root_variation.length; i++) {
-		let current = root_variation[i];
+		current = root_variation[i];
 		if (!(ply & 1) || !have_fullmove_label) {
 			moves_html += `<div class="move-number">${(ply >> 1) + 1}</div>`;
 			if (ply & 1) {
@@ -419,7 +705,7 @@ const printMoves = () => {
 		moves_html
 			+= '<div'
 				+ ' class="move' + (
-					current_variation_id === 0 && ply === current_ply
+					current_variation_id === 0 && i === current_history_idx
 							? ' current'
 							: ''
 				) + '"'
@@ -429,25 +715,58 @@ const printMoves = () => {
 		if (current.variations) {
 			moves_html += '<div class="variation-box"><ul class="variation">';
 			for (const v of current.variations) {
-				moves_html += getVariationHTML(v[1], ply, current_ply);
+				moves_html += getVariationHTML(v[1], ply);
 			}
 			moves_html += '</ul></div>';
-			if (i === root_variation.length) {
-				break;
-			}
 			have_fullmove_label = false;
 		}
 	}
 	moves_element.innerHTML = moves_html;
 	Array.prototype.forEach.call(
 		document.getElementsByClassName('move'),
-		(el) => el.addEventListener('click', moveCallback)
+		(el) => {
+			if (el.className.includes('gap')) {
+				return;
+			}
+			el.addEventListener('click', moveCallback);
+			el.addEventListener('contextmenu', menuCallback(moves_ctxmenu));
+		}
 	);
 	Array.prototype.forEach.call(
 		document.getElementsByClassName('variation-move'),
-		(el) => el.addEventListener('click', moveCallback)
+		(el) => {
+			if (el.className.includes('gap')) {
+				return;
+			}
+			el.addEventListener('click', moveCallback);
+			el.addEventListener('contextmenu', menuCallback(vmoves_ctxmenu));
+		}
 	);
-}
+};
+
+document.addEventListener('keydown', (e) => {
+	switch (e.key) {
+		case 'ArrowLeft':
+			if (current_history_idx > 0) {
+				navigateToMove(current_variation_id, current_history_idx - 1);
+			}
+			break;
+		case 'ArrowRight':
+			if (current_history_idx < current_variation.length - 1) {
+				navigateToMove(current_variation_id, current_history_idx + 1);
+			}
+			break;
+		case 'Home':
+			navigateToMove(0, 0);
+			break;
+		case 'End':
+			navigateToMove(current_variation_id, current_variation.length - 1);
+			break;
+		case 'Escape':
+			clearCurrentCtxmenu();
+		default:
+	}
+});
 
 /* ----------------------------- Piece movement ----------------------------- */
 
@@ -530,12 +849,12 @@ const clearLegals = () => {
 const movePiece = (px, py, tx, ty, from_drag) => {
 	// Pieces move like kings.
 	if (px == tx && py == ty || Math.abs(tx - px) > 1 || Math.abs(ty - py) > 1) {
-		return false;
+		return;
 	}
 	const piece = board[py][px];
 	const target_piece = board[ty][tx];
 	if (!couldTake(piece, target_piece)) {
-		return false;
+		return;
 	}
 	board[py][px] = 0;
 	board[ty][tx] = piece;
@@ -546,7 +865,6 @@ const movePiece = (px, py, tx, ty, from_drag) => {
 		tx: tx, ty: ty,
 		captured: target_piece,
 		rule50_before: rule50,
-		variations: null,
 	};
 	rule50 = target_piece ? 0 : rule50 + 1;
 	put_move: do {
@@ -563,7 +881,7 @@ const movePiece = (px, py, tx, ty, from_drag) => {
 		const prev = current_variation[current_history_idx];
 		const move_numeric = getMoveNumeric(move);
 		let prev_variations;
-		if (!prev.variations) {
+		if (typeof(prev.variations) === 'undefined') {
 			prev.variations = [];
 			prev_variations = prev.variations;
 		} else {
@@ -573,13 +891,13 @@ const movePiece = (px, py, tx, ty, from_drag) => {
 					continue;
 				}
 				current_variation_id = prev_variations[i][1];
-				current_variation = history_tree.get(current_variation_id);
+				current_variation = move_history.get(current_variation_id);
 				current_history_idx = 1;
 				break put_move;
 			}
 		}
 		const id = getNextID();
-		history_tree.set(id, [
+		move_history.set(id, [
 			{
 				from: current_variation_id,
 				from_idx: current_history_idx,
@@ -588,7 +906,7 @@ const movePiece = (px, py, tx, ty, from_drag) => {
 			move,
 		]);
 		prev.variations.push([move_numeric, id]);
-		current_variation = history_tree.get(id);
+		current_variation = move_history.get(id);
 		current_variation_id = id;
 		current_history_idx = 1;
 	} while (false);
@@ -612,7 +930,7 @@ const movePiece = (px, py, tx, ty, from_drag) => {
 	document.getElementById(getSquareName(tx, ty)).className = 'previous cell';
 	setSide();
 	if (from_drag || matchMedia?.('(prefers-reduced-motion)')?.matches) {
-		return true;
+		return;
 	}
 	const rect = board_element.getBoundingClientRect();
 	// The board should be square.
@@ -621,7 +939,6 @@ const movePiece = (px, py, tx, ty, from_drag) => {
 			// The y-axis is inverted.
 			+ `transform: translate(${(px - tx) * size}px, ${(ty - py) * size}px);`;
 	setTimeout(() => piece_element.removeAttribute('style'));
-	return true;
 }
 
 /**
@@ -637,8 +954,8 @@ const movePiece = (px, py, tx, ty, from_drag) => {
 const getMousedCell = (e) => {
 	const board_rect = board_element.getBoundingClientRect();
 	return {
-		x: Math.floor(9 * (e.x - board_rect.x) / board_rect.width),
-		y: 8 - Math.floor(9 * (e.y - board_rect.y) / board_rect.height)
+		x: Math.floor(9 * (e.clientX - board_rect.x) / board_rect.width),
+		y: 8 - Math.floor(9 * (e.clientY - board_rect.y) / board_rect.height)
 	};
 }
 
@@ -654,7 +971,7 @@ const clearActiveSquare = () => {
 };
 const dragRelease = (e) => {
 	if (!active_piece) {
-		return false;
+		return;
 	}
 	const piece = active_piece;
 	active_piece = null;
@@ -672,11 +989,10 @@ const dragRelease = (e) => {
 	piece.removeAttribute('active');
 	if (matchMedia?.('(prefers-reduced-motion)')?.matches) {
 		piece.removeAttribute('style');
-		return true;
+		return;
 	}
 	piece.style.cssText = 'transition: none; transform: scale(0.925);';
 	setTimeout(() => piece.removeAttribute('style'));
-	return true;
 };
 document.addEventListener('mouseup', dragRelease);
 const dragPiece = (e) => {
@@ -684,22 +1000,23 @@ const dragPiece = (e) => {
 		return dragRelease(e);
 	}
 	if (!active_piece) {
-		return false;
+		return;
 	}
 	const rect = active_piece.parentElement.getBoundingClientRect();
-	active_piece.style.cssText = `left: ${e.x - rect.x - 0.5 * rect.width}px;`
-			+ ` top: ${e.y - rect.y - 0.5 * rect.height}px;`;
+	active_piece.style.cssText = `left: ${e.clientX - rect.x - 0.5 * rect.width}px;`
+			+ ` top: ${e.clientY - rect.y - 0.5 * rect.height}px;`;
 };
 document.addEventListener('mousemove', dragPiece);
 
 Array.prototype.forEach.call(document.getElementsByClassName('icon'), (el) => {
 	let active = false;
 	el.addEventListener('click', () => {
-		active = !active;
 		if (active) {
-			el.setAttribute('active', 'active');
-		} else {
+			active = false;
 			el.removeAttribute('active');
+		} else {
+			active = true;
+			el.setAttribute('active', 'active');
 		}
 	});
 });
@@ -786,41 +1103,39 @@ board_element.addEventListener('mousedown', (e) => {
 	if (e.button !== 2) {
 		drawn_arrows.clear();
 		arrow_element.innerHTML = '';
-		return false;
+		return;
 	}
 	const {x, y} = getMousedCell(e);
 	if (x < 0 || x > 8 || y < 0 || y > 8) {
-		return false;
+		return;
 	}
 	ghost.px = ghost.tx = x;
 	ghost.py = ghost.ty = 8 - y;
 	ghost.color = 1 * Number(e.shiftKey) | 2 * Number(e.ctrlKey) | 4 * Number(e.altKey);
 	drawGhost();
 	ghost.present = true;
-	return true;
 });
 document.addEventListener('mousemove', (e) => {
 	if (!ghost.present) {
-		return false;
+		return;
 	}
 	if (!(e.buttons & 2)) {
 		eraseGhost();
 		ghost.present = false;
-		return false;
+		return;
 	}
 	const {x, y} = getMousedCell(e);
 	if (ghost.tx === x && ghost.ty === y) {
-		return true;
+		return;
 	}
 	eraseGhost();
 	ghost.tx = x;
 	ghost.ty = 8 - y;
 	drawGhost();
-	return true;
 });
 document.addEventListener('mouseup', (e) => {
 	if (e.button !== 2 || !ghost.present) {
-		return false;
+		return;
 	}
 	eraseGhost();
 	ghost.present = false;

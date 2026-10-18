@@ -41,13 +41,31 @@
 		</noscript>
 		<div id="outer"></div>
 		<script>document.getElementById('outer').innerHTML = `
+			<div id="cursor-anchor"></div>
+			<div id="moves-ctxmenu" class="contextmenu"><menu>
+				<button id="m-force-var">Force into variation</button>
+				<hr>
+				<button id="m-del">Delete from here</button>
+			</menu></div>
+			<div id="vmoves-ctxmenu" class="contextmenu"><menu>
+				<button id="vm-promote">Promote variation</button>
+				<button id="vm-to-main">Promote to mainline</button>
+				<button id="vm-top">Move to top</button>
+				<button id="vm-up">Move up</button>
+				<button id="vm-down">Move down</button>
+				<button id="vm-bottom">Move to bottom</button>
+				<hr>
+				<button id="vm-del">Delete from here</button>
+			</menu></div>
 			<div class="sidebar-outer">
 				<div class="sidebar">
 					<div class="bar-item"><div class="icon" id="settings"></div></div>
 				</div>
 			</div>
 			<div class="board-outer">
-				<div id="board"></div>
+				<div id="board">
+					${[...Array(81)].map(() => '<div class="cell"></div>').join('')}
+				</div>
 				<div class="arrows-outer">
 					<div class="arrows-shell">
 						<svg id="arrows" viewBox="-0.5 -0.5 9 9">

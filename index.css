@@ -3,6 +3,7 @@
 }
 
 :root {
+	background-color: var(--base);
 	font-family: sans-serif;
 	--rock: url('./assets/webgoat/rock.svg') center / contain no-repeat;
 	--paper: url('./assets/webgoat/paper.svg') center / contain no-repeat;
@@ -11,9 +12,11 @@
 	--quad-out: cubic-bezier(0.333, 0.667, 0.667, 1);
 }
 :root[theme=latte] {
-	background-color: #eff1f5;
+	--base: #eff1f5;
 	color: #4c4f69;
+	scrollbar-color: #9ca0b0 transparent;
 	--crust: #dce0e8;
+	--mantle: #e6e9ef;
 	--wall: #7c7f93;
 	--soft: #6c6f85;
 	--red: #e64553;
@@ -31,15 +34,18 @@
 	--color-5: #8839ef;
 	--color-6: #179299;
 	--color-7: #7c7f93;
-	--surface-2: #d9a39a;
+	--surface-sel: #d9a39a;
 	--surface-1: #bcc0cc;
 	--surface-0: #ccd0da;
 	--move-dot: #7c7f9399;
+	--crust-sel: #dfb7b2;
 }
 :root[theme=mocha] {
-	background-color: #1e1e2e;
+	--base: #1e1e2e;
 	color: #cdd6f4;
+	scrollbar-color: #6c7086 transparent;
 	--crust: #11111b;
+	--mantle: #181825;
 	--wall: transparent;
 	--soft: #a6adc8;
 	--red: #eba0ac;
@@ -57,20 +63,65 @@
 	--color-5: #cba6f7;
 	--color-6: #94e2d5;
 	--color-7: #9399b2;
-	--surface-2: #5e5a68;
+	--surface-sel: #5e5a68;
 	--surface-1: #45475a;
 	--surface-0: #313244;
 	--move-dot: #9399b299;
+	--crust-sel: #38353d;
 }
 :root[theme=latte], :root[theme=mocha] {
 	--outline: transparent;
 	--translucent: 60%;
 }
-
 body {
 	margin: 0;
 	overflow-x: hidden;
 }
+
+#cursor-anchor {
+	position: fixed;
+	width: 1px;
+	height: 1px;
+	pointer-events: none;
+	anchor-name: --cursor-anchor;
+}
+.contextmenu {
+	display: none;
+	position: fixed;
+	z-index: 20;
+	position-anchor: --cursor-anchor;
+	inset-area: block-end inline-end;
+	position-area: block-end inline-end;
+	position-try: flip-block;
+	background-color: var(--base);
+	width: max-content;
+	box-shadow: 0 0 4px black;
+}
+menu {
+	display: grid;
+	margin: 0;
+	grid-template-columns: max-content;
+	grid-auto-rows: min-content;
+	background-color: var(--wall);
+	padding: 2px;
+}
+menu > hr {
+	margin: 0;
+	border-color: transparent;
+}
+button {
+	background-color: var(--crust);
+	text-align: inherit;
+	color: inherit;
+	font: inherit;
+	border: none;
+	line-height: 1;
+	padding: 0.5em;
+}
+button:hover {
+	background-color: var(--crust-sel);
+}
+
 #outer, .board-outer {
 	display: flex;
 	position: relative;
@@ -222,7 +273,6 @@ body {
 	flex-direction: column-reverse;
 	margin: 1px;
 	overflow-y: scroll;
-	scrollbar-color: var(--surface-2) transparent;
 	background-color: var(--crust);
 	flex: 1 1 auto;
 	max-height: var(--size);
@@ -268,6 +318,7 @@ body {
 	border-top: 1px solid var(--wall);
 	border-bottom: 1px solid var(--wall);
 	padding: 0.25em 0;
+	margin: -2px 0;
 }
 .variation {
 	list-style-type: '\251c';
@@ -285,11 +336,11 @@ body {
 	cursor: pointer;
 }
 .current {
-	background-color: var(--surface-2);
-	pointer-events: none;
+	background-color: var(--surface-sel);
+	cursor: default;
 }
 .move:hover, .variation-move:hover {
-	background-color: var(--surface-2);
+	background-color: var(--surface-sel);
 }
 .move.gap:hover {
 	background-color: transparent;
@@ -373,7 +424,7 @@ body {
 
 @media not (prefers-reduced-motion) {
 	.piece {
-		transition: transform 0.2s var(--quad-out), opacity 0.2s linear;
+		transition: transform 0.2s var(--quad-out), opacity 0.1s linear;
 	}
 	.piece[active=active] {
 		transition: none;
