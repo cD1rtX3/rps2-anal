@@ -8,7 +8,6 @@
 	--rock: url('./assets/webgoat/rock.svg') center / contain no-repeat;
 	--paper: url('./assets/webgoat/paper.svg') center / contain no-repeat;
 	--scissors: url('./assets/webgoat/scissors.svg') center / contain no-repeat;
-	--stick: url('./assets/stick.svg');
 	--quad-out: cubic-bezier(0.333, 0.667, 0.667, 1);
 }
 :root[theme=latte] {
@@ -221,18 +220,28 @@ button:hover {
 	right: 0.4em;
 	top: 0.4em;
 }
-.stick {
+.stick, .crown {
 	position: absolute;
-	width: 1.5em;
-	height: 1.5em;
-	background-image: var(--stick);
 	z-index: 5;
 }
-.blue.stick {
+.stick {
+	width: 1.5em;
+	height: 1.5em;
+	background-image: url('./assets/stick.svg');
+}
+.crown {
+	width: 2.25em;
+	height: 2.25em;
+	background-image: url('./assets/crown.svg');
+}
+.dove {
+	background-image: url('./assets/dove.svg');
+}
+.blue.stick, .blue.crown {
 	top: 0;
 	right: 0;
 }
-.red.stick {
+.red.stick, .red.crown {
 	bottom: 0;
 	left: 0;
 }
@@ -254,7 +263,7 @@ button:hover {
 	z-index: 10;
 	cursor: grabbing;
 }
-.piece[opponent=opponent] {
+.piece[inactive=inactive] {
 	pointer-events: none;
 }
 
@@ -307,10 +316,6 @@ button:hover {
 	overflow: visible;
 	cursor: pointer;
 }
-.move.gap {
-	background-color: transparent;
-	cursor: default;
-}
 .variation-box {
 	font-size: 1rem;
 	font-size: round(1rem, 1px);
@@ -342,7 +347,11 @@ button:hover {
 .move:hover, .variation-move:hover {
 	background-color: var(--surface-sel);
 }
-.move.gap:hover {
+.move.gap, .variation-move.gap {
+	background-color: transparent;
+	cursor: default;
+}
+.move.gap:hover, .variation-move.gap:hover {
 	background-color: transparent;
 }
 

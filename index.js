@@ -108,6 +108,25 @@ const getFen = () => {
 };
 
 const setSide = () => {
+	if (typeof(adjudication) !== 'undefined') {
+		Array.prototype.forEach.call(document.getElementsByClassName('stick'), (el) => {
+			el.style.cssText = 'display: none;';
+		});
+		Array.prototype.forEach.call(document.getElementsByClassName('piece'), (el) => {
+			el.setAttribute('inactive', 'inactive');
+		});
+		if (adjudication === 1) {
+			document.getElementById('A1').innerHTML += '<span class="blue crown"></span>';
+		} else if (adjudication === 0) {
+			document.getElementById('A1').innerHTML
+				+= '<span class="blue crown dove"></span>';
+			document.getElementById('I9').innerHTML
+				+= '<span class="red crown dove"></span>';
+		} else if (adjudication === -1) {
+			document.getElementById('I9').innerHTML += '<span class="red crown"></span>';
+		}
+		return;
+	}
 	const to_move = red_to_move ? 'red ' : 'blue ';
 	const opponent = red_to_move ? 'blue ' : 'red ';
 	document.getElementsByClassName(opponent + 'stick').item(0).style.cssText
@@ -121,11 +140,11 @@ const setSide = () => {
 	}
 	Array.prototype.forEach.call(
 		document.getElementsByClassName(to_move + 'piece'),
-		(el) => el.removeAttribute('opponent')
+		(el) => el.removeAttribute('inactive')
 	);
 	Array.prototype.forEach.call(
 		document.getElementsByClassName(opponent + 'piece'),
-		(el) => el.setAttribute('opponent', 'opponent')
+		(el) => el.setAttribute('inactive', 'inactive')
 	);
 }
 const board_element = document.getElementById('board');
@@ -134,6 +153,30 @@ let drag_origin_x = 0;
 let drag_origin_y = 0;
 let active_square = {element: null};
 
+/** @param {MouseEvent} e */
+const dragStart = (e) => {
+	if (e.button !== 0) {
+		return;
+	}
+	const parent = e.currentTarget.parentElement;
+	const {x, y} = getNamedSquare(parent.id);
+	if (!(board[y][x] & 4) === red_to_move) {
+		return;
+	}
+	if (active_square.element !== parent) {
+		active_square.element?.removeAttribute('active');
+		active_square.x = x;
+		active_square.y = y;
+		drawLegals();
+	}
+	active_square.element = parent;
+	active_square.element.setAttribute('active', 'active');
+	e.currentTarget.setAttribute('active', 'active');
+	drag_origin_x = e.pageX;
+	drag_origin_y = e.pageY;
+	active_piece = e.currentTarget;
+	return dragPiece(e);
+}
 const piece_strings = [undefined, 'rock', 'paper', 'scissors'];
 const setUpBoard = () => {
 	let board_html = '';
@@ -180,29 +223,7 @@ const setUpBoard = () => {
 		})
 	});
 	Array.prototype.forEach.call(document.getElementsByClassName('piece'), (el) => {
-		el.addEventListener('mousedown', (e) => {
-			if (e.button !== 0) {
-				return;
-			}
-			const parent = el.parentElement;
-			const {x, y} = getNamedSquare(parent.id);
-			if (!(board[y][x] & 4) === red_to_move) {
-				return;
-			}
-			if (active_square.element !== parent) {
-				active_square.element?.removeAttribute('active');
-				active_square.x = x;
-				active_square.y = y;
-				drawLegals();
-			}
-			active_square.element = parent;
-			active_square.element.setAttribute('active', 'active');
-			el.setAttribute('active', 'active');
-			drag_origin_x = e.pageX;
-			drag_origin_y = e.pageY;
-			active_piece = el;
-			return dragPiece(e);
-		});
+		el.addEventListener('mousedown', dragStart);
 	});
 	setSide();
 };
@@ -264,7 +285,7 @@ const menuCallback = (menu) => (e) => {
 		}
 		(
 			{[0]: sel_move.variation_id, [1]: sel_move.idx}
-				= e.target.id.split(':').map(Number)
+				= e.currentTarget.id.split(':').map(Number)
 		);
 		sel_move.variation = move_history.get(sel_move.variation_id);
 		if (menu !== vmoves_ctxmenu) {
@@ -413,7 +434,11 @@ const promoteVariation = () => {
 		sel_move.variation.push(...parent_moves);
 	} else {
 		const siblings = parent[from_idx].variations;
-		siblings.splice(siblings.findIndex((v) => v[1] === sel_move.variation_id), 1);
+		if (siblings.length === 1) {
+			parent[from_idx].variations = undefined;
+		} else {
+			siblings.splice(siblings.findIndex((v) => v[1] === sel_move.variation_id), 1);
+		}
 		move_history.delete(sel_move.variation_id);
 	}
 	parent.push(...our_moves);
@@ -447,22 +472,22 @@ const moveVariation = (e) => {
 	const siblings = move_history.get(header.from)[header.from_idx].variations;
 	const sel_idx = siblings.findIndex((v) => v[1] === sel_move.variation_id);
 	const item = siblings[sel_idx];
-	if (e.target === vm_top) {
+	if (e.currentTarget === vm_top) {
 		siblings.splice(1, sel_idx, ...siblings.slice(0, sel_idx));
 		siblings[0] = item;
-	} else if (e.target === vm_up) {
+	} else if (e.currentTarget === vm_up) {
 		if (sel_idx === 0) {
 			throw Error('Tried to move variation up from the top.');
 		}
 		siblings[sel_idx] = siblings[sel_idx - 1];
 		siblings[sel_idx - 1] = item;
-	} else if (e.target === vm_down) {
+	} else if (e.currentTarget === vm_down) {
 		if (sel_idx === siblings.length - 1) {
 			throw Error('Tried to move variation down from the bottom.');
 		}
 		siblings[sel_idx] = siblings[sel_idx + 1];
 		siblings[sel_idx + 1] = item;
-	} else if (e.target === vm_bottom) {
+	} else if (e.currentTarget === vm_bottom) {
 		siblings.splice(sel_idx, 1);
 		siblings.push(item);
 	} else {
@@ -601,7 +626,9 @@ const navigateToMove = (variation_id, idx) => {
 			stepForward();
 		}
 	}
+	adjudication = current_variation[current_history_idx].adjudication;
 
+	[...document.getElementsByClassName('crown')].forEach((el) => el.remove());
 	setUpBoard();
 	if (should_animate) {
 		const cell_size
@@ -644,7 +671,18 @@ const navigateToMove = (variation_id, idx) => {
 
 /** @param {MouseEvent} e */
 const moveCallback = (e) => {
-	navigateToMove(...e.target.id.split(':').map(Number));
+	navigateToMove(...e.currentTarget.id.split(':').map(Number));
+};
+const getEndText = (adjudication) => {
+	switch (adjudication) {
+		case 1:
+			return '1&ndash;0';
+		case 0:
+			return '&#189;&ndash;&#189;';
+		case -1:
+			return '0&ndash;1';
+		default:
+	}
 };
 const getVariationHTML = (id, ply) => {
 	let moves_html = '<li>'
@@ -664,6 +702,11 @@ const getVariationHTML = (id, ply) => {
 				+ getNotation(current, false)
 			+ '</span>&ZeroWidthSpace;';
 		ply++;
+		if (typeof(current.adjudication) !== 'undefined') {
+			moves_html += '<span class="variation-move gap">'
+					+ getEndText(current.adjudication)
+				+ '</span>';
+		}
 		if (current.variations) {
 			moves_html += '<ul class="variation">';
 			for (const v of current.variations) {
@@ -698,7 +741,7 @@ const printMoves = () => {
 		if (!(ply & 1) || !have_fullmove_label) {
 			moves_html += `<div class="move-number">${(ply >> 1) + 1}</div>`;
 			if (ply & 1) {
-				moves_html += '<div class="move gap">&hellip;</div>'
+				moves_html += '<div class="move gap">&hellip;</div>';
 			}
 			have_fullmove_label = true;
 		}
@@ -711,6 +754,13 @@ const printMoves = () => {
 				) + '"'
 				+ ` id="0:${i}"`
 			+ `>${getNotation(current, false)}</div>`;
+		if (typeof(current.adjudication) !== 'undefined') {
+			if (ply & 1) {
+				moves_html += '<div class="move gap"></div>';
+			}
+			moves_html += `<div class="move gap">${getEndText(current.adjudication)}</div>`;
+			break;
+		}
 		ply++;
 		if (current.variations) {
 			moves_html += '<div class="variation-box"><ul class="variation">';
@@ -722,25 +772,20 @@ const printMoves = () => {
 		}
 	}
 	moves_element.innerHTML = moves_html;
+	const addCallback = (menu) => (el) => {
+		if (el.className.includes('gap')) {
+			return;
+		}
+		el.addEventListener('click', moveCallback);
+		el.addEventListener('contextmenu', menuCallback(menu));
+	}
 	Array.prototype.forEach.call(
 		document.getElementsByClassName('move'),
-		(el) => {
-			if (el.className.includes('gap')) {
-				return;
-			}
-			el.addEventListener('click', moveCallback);
-			el.addEventListener('contextmenu', menuCallback(moves_ctxmenu));
-		}
+		addCallback(moves_ctxmenu)
 	);
 	Array.prototype.forEach.call(
 		document.getElementsByClassName('variation-move'),
-		(el) => {
-			if (el.className.includes('gap')) {
-				return;
-			}
-			el.addEventListener('click', moveCallback);
-			el.addEventListener('contextmenu', menuCallback(vmoves_ctxmenu));
-		}
+		addCallback(vmoves_ctxmenu)
 	);
 };
 
@@ -847,6 +892,9 @@ const clearLegals = () => {
 };
 
 const movePiece = (px, py, tx, ty, from_drag) => {
+	if (typeof(adjudication) !== 'undefined') {
+		return;
+	}
 	// Pieces move like kings.
 	if (px == tx && py == ty || Math.abs(tx - px) > 1 || Math.abs(ty - py) > 1) {
 		return;
@@ -858,8 +906,9 @@ const movePiece = (px, py, tx, ty, from_drag) => {
 	}
 	board[py][px] = 0;
 	board[ty][tx] = piece;
-	current_fullmove += Number(red_to_move);
 	red_to_move = !red_to_move;
+	const to_move_as_number = Number(red_to_move);
+	current_fullmove += 1 - to_move_as_number;
 	const move = {
 		px: px, py: py,
 		tx: tx, ty: ty,
@@ -867,6 +916,35 @@ const movePiece = (px, py, tx, ty, from_drag) => {
 		rule50_before: rule50,
 	};
 	rule50 = target_piece ? 0 : rule50 + 1;
+	if ((board[8][8] ^ 4) > 4) {
+		adjudication = 1;
+	} else if (board[0][0] > 4) {
+		adjudication = -1;
+	} else if (!board.some((row, y) => row.some((cell, x) => {
+			if ((cell - 1) >> 2 !== to_move_as_number) {
+				return false;
+			}
+			for (let uy = y - 1; uy <= y + 1; uy++) {
+				if (uy < 0 || uy > 8) {
+					continue;
+				}
+				for (let ux = x - 1; ux <= x + 1; ux++) {
+					if (ux < 0 || ux > 8 || (!ux && !uy)) {
+						continue;
+					}
+					if (couldTake(cell, board[uy][ux])) {
+						return true;
+					}
+				}
+			}
+			return false;
+		}))) {
+		// Stalemate.
+		adjudication = red_to_move ? 1 : -1;
+	} else if (rule50 === 200) {
+		adjudication = 0;
+	}
+	move.adjudication = adjudication;
 	put_move: do {
 		// why doesn't javascript have goto
 		if (current_history_idx === current_variation.length - 1) {
@@ -929,6 +1007,10 @@ const movePiece = (px, py, tx, ty, from_drag) => {
 	document.getElementById(getSquareName(px, py)).className = 'previous cell';
 	document.getElementById(getSquareName(tx, ty)).className = 'previous cell';
 	setSide();
+	// stupid browser bug
+	Array.prototype.forEach.call(document.getElementsByClassName('piece'), (el) => {
+		el.addEventListener('mousedown', dragStart);
+	});
 	if (from_drag || matchMedia?.('(prefers-reduced-motion)')?.matches) {
 		return;
 	}
