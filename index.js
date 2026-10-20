@@ -349,7 +349,7 @@ const freeVariationSince = (id, idx, base_id, base_idx) => {
 			freeVariationSince(subvars[j][1], 1, base_id, base_idx);
 		}
 	}
-	if (id !== 0 && idx === 1) {
+	if (id !== '0' && idx === 1) {
 		const parent = move_history[variation[0].from][variation[0].from_idx];
 		const siblings = parent.variations;
 		const N = siblings.length;
