@@ -811,7 +811,7 @@ document.addEventListener('keydown', (e) => {
 			}
 			break;
 		case 'Home':
-			navigateToMove(0, 0);
+			navigateToMove('0', 0);
 			break;
 		case 'End':
 			navigateToMove(current_variation_id, current_variation.length - 1);
