@@ -63,6 +63,11 @@
 				</div>
 			</div>
 			<div class="board-outer">
+				<div class="sidebar-content" id="settings-content">
+					<h1>Ceci n'est pas un elément.</h1>
+					<p>Ceci n'est pas un elément.
+					<p>Ceci n'est pas un elément.
+				</div>
 				<div id="board">
 					${[...Array(81)].map(() => '<div class="cell"></div>').join('')}
 				</div>
@@ -71,11 +76,7 @@
 						<svg id="arrows" viewBox="-0.5 -0.5 9 9">
 							<defs>
 								${[...Array(8)].map((_, i) => `
-									<marker
-										id="arrowhead-${i}"
-										orient="auto"
-										overflow="visible"
-									>
+									<marker id="arrowhead-${i}" orient="auto" overflow="visible">
 										<path d="M 0.95 0 l -3 2 v -4 Z" fill="var(--color-${i})" />
 									</marker>
 								`).join('')}

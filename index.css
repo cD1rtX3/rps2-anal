@@ -9,6 +9,7 @@
 	--paper: url('./assets/webgoat/paper.svg') center / contain no-repeat;
 	--scissors: url('./assets/webgoat/scissors.svg') center / contain no-repeat;
 	--quad-out: cubic-bezier(0.333, 0.667, 0.667, 1);
+	--shadow: 0 0 4px black;
 }
 :root[theme=latte] {
 	--base: #eff1f5;
@@ -79,8 +80,8 @@ body {
 
 #cursor-anchor {
 	position: fixed;
-	width: 1px;
-	height: 1px;
+	width: 2px;
+	height: 2px;
 	pointer-events: none;
 	anchor-name: --cursor-anchor;
 }
@@ -94,7 +95,7 @@ body {
 	position-try: flip-block;
 	background-color: var(--base);
 	width: max-content;
-	box-shadow: 0 0 4px black;
+	box-shadow: var(--shadow);
 }
 menu {
 	display: grid;
@@ -375,6 +376,7 @@ button:hover {
 	width: 100%;
 	height: 100%;
 	background-color: var(--soft);
+	user-select: none;
 }
 .icon:hover, .icon[active=active] {
 	background-color: currentColor;
@@ -385,6 +387,27 @@ button:hover {
 }
 .icon#settings[active=active] {
 	rotate: 90deg;
+}
+
+.sidebar-content {
+	display: none;
+	/* display: grid; */
+	position: absolute;
+	z-index: 15;
+	max-height: var(--size);
+	background-color: var(--crust);
+	box-shadow: inset 0 0 0 2px var(--wall), inset 0 0 0 2px var(--base), var(--shadow);
+	padding: 10px 10px;
+	gap: 8px;
+}
+.sidebar-content > * {
+	margin: 0;
+}
+#settings-content {
+	grid-template-columns: 2fr 1fr;
+}
+#settings-content {
+	grid-template-columns: 2fr 1fr;
 }
 
 /* Landscape mode. There needs to be enough space. */
@@ -417,6 +440,12 @@ button:hover {
 	.analysis {
 		height: 100%;
 	}
+	.sidebar-content {
+		inset-inline-start: -6px;
+		inset-block-start: 8px;
+		width: 60ch;
+		max-width: calc(100% - 16px);
+	}
 }
 @media not ((width >= 100vh) and (width >= 51em)) {
 	html {
@@ -429,6 +458,11 @@ button:hover {
 	.analysis-outer, .sidebar-outer {
 		width: var(--size);
 	}
+	.sidebar-content {
+		inset-inline-start: 8px;
+		inset-block-start: -6px;
+		width: calc(100% - 16px);
+	}
 }
 
 @media not (prefers-reduced-motion) {
@@ -437,8 +471,5 @@ button:hover {
 	}
 	.piece[active=active] {
 		transition: none;
-	}
-	.icon#settings {
-		transition: rotate 0.25s linear;
 	}
 }

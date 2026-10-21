@@ -233,7 +233,8 @@ setSide();
 
 const cursor_anchor = document.getElementById('cursor-anchor');
 const updateCursorAnchor = (e) => {
-	cursor_anchor.style.cssText = `left: ${e.clientX}px; top: ${e.clientY}px;`;
+	cursor_anchor.style.cssText
+		= `left: ${e.clientX - 1}px; top: ${e.clientY - 1}px;`;
 };
 
 const sel_move = {};
@@ -1099,19 +1100,6 @@ const dragPiece = (e) => {
 };
 document.addEventListener('mousemove', dragPiece);
 
-Array.prototype.forEach.call(document.getElementsByClassName('icon'), (el) => {
-	let active = false;
-	el.addEventListener('click', () => {
-		if (active) {
-			active = false;
-			el.removeAttribute('active');
-		} else {
-			active = true;
-			el.setAttribute('active', 'active');
-		}
-	});
-});
-
 /* --------------------------------- Arrows --------------------------------- */
 
 const arrowCircle = (x, y, color, is_ghost) => '<circle'
@@ -1232,6 +1220,41 @@ document.addEventListener('mouseup', (e) => {
 	ghost.present = false;
 	drawArrow(ghost.px, ghost.py, ghost.tx, ghost.ty, ghost.color);
 });
+
+/* -------------------------------- Sidebar --------------------------------- */
+
+let active_icon;
+let sidebar_content;
+
+const clearActiveIcon = () => {
+	sidebar_content.removeAttribute('style');
+	active_icon.removeAttribute('active');
+	active_icon = undefined;
+}
+
+/**
+ * Sets or clears the active icon.
+ *
+ * @param {PointerEvent} e
+ */
+const setActiveIcon = (e) => {
+	const icon = e.currentTarget;
+	console.log(icon);
+	if (active_icon === icon) {
+		clearActiveIcon();
+		return;
+	}
+	active_icon?.removeAttribute('active');
+	active_icon = icon;
+	icon.setAttribute('active', 'active');
+	sidebar_content = document.getElementById(icon.id + '-content');
+	sidebar_content.style.cssText = 'display: grid;';
+}
+
+Array.prototype.forEach.call(
+	document.getElementsByClassName('icon'),
+	(el) => el.addEventListener('click', setActiveIcon)
+);
 
 // // A chess pawn's approximate value in Intransitive pieces.
 // const PAWN_VALUE = 0.1861797350519155;
