@@ -113,7 +113,7 @@ const setSide = () => {
 			el.style.cssText = 'display: none;';
 		});
 		Array.prototype.forEach.call(document.getElementsByClassName('piece'), (el) => {
-			el.setAttribute('inactive', 'inactive');
+			el.setAttribute('disabled', 'disabled');
 		});
 		if (adjudication === 1) {
 			document.getElementById('A1').innerHTML += '<span class="blue crown"></span>';
@@ -140,11 +140,11 @@ const setSide = () => {
 	}
 	Array.prototype.forEach.call(
 		document.getElementsByClassName(to_move + 'piece'),
-		(el) => el.removeAttribute('inactive')
+		(el) => el.removeAttribute('disabled')
 	);
 	Array.prototype.forEach.call(
 		document.getElementsByClassName(opponent + 'piece'),
-		(el) => el.setAttribute('inactive', 'inactive')
+		(el) => el.setAttribute('disabled', 'disabled')
 	);
 }
 const board_element = document.getElementById('board');
@@ -195,11 +195,23 @@ const setUpBoard = () => {
 								+ '>'
 							+ '</span>'
 							: ''
+					) + (
+						x === 8
+							? '<svg class="row coord" viewBox="0 0 1 1">'
+								+ `<text x="1" y="0">${cell_name[1]}</text>`
+							+ '</svg>'
+							: ''
+					) + (
+						y === 0
+							? '<svg class="column coord" viewBox="0 0 1 1">'
+								+ `<text x="0" y="1">${cell_name[0]}</text>`
+							+ '</svg>'
+							: ''
+					) + (
+						x === 8 && y == 8 ? '<span class="red stick" title="Talking Stick"></span>' : ''
+					) + (
+						x === 0 && y == 0 ? '<span class="blue stick" title="Talking Stick"></span>' : ''
 					)
-					+ (x === 8 ? `<span class="row coord">${cell_name[1]}</span>` : '')
-					+ (y === 0 ? `<span class="column coord">${cell_name[0]}</span>` : '')
-					+ (x === 8 && y == 8 ? '<span class="red stick" title="Talking Stick"></span>' : '')
-					+ (x === 0 && y == 0 ? '<span class="blue stick" title="Talking Stick"></span>' : '')
 				+ '</div>';
 		}
 	}
@@ -250,12 +262,6 @@ const clearCurrentCtxmenu = () => {
 	current_ctxmenu.removeAttribute('style');
 	current_ctxmenu = null;
 };
-document.addEventListener('mousedown', (e) => {
-	if (e.button !== 0) {
-		return;
-	}
-	clearCurrentCtxmenu();
-});
 
 const moves_ctxmenu = document.getElementById('moves-ctxmenu');
 const m_force_var = document.getElementById('m-force-var');
@@ -275,6 +281,10 @@ const menuCallback = (menu) => (e) => {
 		return;
 	}
 	e.preventDefault();
+	if (current_ctxmenu === menu) {
+		clearCurrentCtxmenu();
+		return;
+	}
 	clearCurrentCtxmenu();
 	current_ctxmenu = menu;
 	updateCursorAnchor(e);
@@ -368,7 +378,10 @@ const freeVariationSince = (id, idx, base_id, base_idx) => {
 	}
 	variation.length = idx;
 };
-const deleteFromHere = () => {
+const deleteFromHere = (e) => {
+	if (e.button !== 0 && e.button !== 2) {
+		return;
+	}
 	freeVariationSince(
 		sel_move.variation_id,
 		sel_move.idx,
@@ -389,7 +402,10 @@ vm_del.addEventListener('mouseup', deleteFromHere);
 
 moves_ctxmenu.addEventListener('contextmenu', preventDefault);
 moves_ctxmenu.addEventListener('mousedown', stopPropagation);
-m_force_var.addEventListener('mouseup', () => {
+m_force_var.addEventListener('mouseup', (e) => {
+	if (e.button !== 0 && e.button !== 2) {
+		return;
+	}
 	const id = getNextID();
 	const prev = sel_move.variation[sel_move.idx - 1];
 	if (typeof(prev.variations) === 'undefined') {
@@ -462,17 +478,26 @@ const promoteVariation = () => {
 	sel_move.variation = parent;
 	sel_move.idx += from_idx;
 };
-vm_promote.addEventListener('mouseup', () => {
+vm_promote.addEventListener('mouseup', (e) => {
+	if (e.button !== 0 && e.button !== 2) {
+		return;
+	}
 	promoteVariation();
 	clearCurrentCtxmenu();
 });
-vm_to_main.addEventListener('mouseup', () => {
+vm_to_main.addEventListener('mouseup', (e) => {
+	if (e.button !== 0 && e.button !== 2) {
+		return;
+	}
 	while (sel_move.variation_id !== 0) {
 		promoteVariation();
 	}
 	clearCurrentCtxmenu();
 });
 const moveVariation = (e) => {
+	if (e.button !== 0 && e.button !== 2) {
+		return;
+	}
 	const header = sel_move.variation[0];
 	const siblings = move_history[header.from][header.from_idx].variations;
 	const sel_idx = siblings.findIndex((v) => v[1] === sel_move.variation_id);
@@ -520,6 +545,9 @@ const getMoveNumeric
 	= (move) => move.px | (move.py << 4) | (move.tx << 8) | (move.ty << 12);
 
 const navigateToMove = (variation_id, idx) => {
+	document.getElementById(`${current_variation_id}:${current_history_idx}`)
+		.removeAttribute('disabled');
+
 	if (variation_id !== '0' && idx === 0) {
 		const header = move_history[variation_id][0];
 		variation_id = header.from;
@@ -657,13 +685,8 @@ const navigateToMove = (variation_id, idx) => {
 		});
 	}
 
-	const active = document.getElementsByClassName('current').item(0);
-	if (active) {
-		active.className
-			= active.className.split(' ').filter((v) => v !== 'current').join(' ');
-	}
 	if (idx > 0) {
-		document.getElementById(`${variation_id}:${idx}`).className += ' current';
+		document.getElementById(`${variation_id}:${idx}`).setAttribute('disabled', 'disabled');
 		const last_move = current_variation[current_history_idx];
 		document.getElementById(
 			getSquareName(last_move.px, last_move.py)
@@ -699,10 +722,9 @@ const getVariationHTML = (id, ply) => {
 		previous = current;
 		current = variation[i];
 		moves_html
-			+= '<span'
-				+ ' class="variation-move' + (
-					on_this && i === current_history_idx ? ' current' : ''
-				) + `" id="${id}:${i}"`
+			+= '<button'
+				+ ` class="variation-move" id="${id}:${i}"`
+				+ (on_this && i === current_history_idx ? 'disabled="disabled"' : '')
 			+ '>'
 				+ `${(ply >> 1) + 1}${ply & 1 ? '&hellip;' : '.'}&nbsp;`
 				+ getNotation(current, false)
@@ -737,25 +759,24 @@ const printMoves = () => {
 	let current = root_variation[0];
 	let ply = current.from_idx;
 	let have_fullmove_label = false;
-	const on_root = current_variation_id === '0';
+	const on_this = current_variation_id === '0';
 	let previous;
 	let i = 1;
 	for (; i < root_variation.length; i++, ply++) {
 		previous = current;
 		current = root_variation[i];
 		if (!(ply & 1) || !have_fullmove_label) {
-			moves_html += `<div class="move-number">${(ply >> 1) + 1}</div>`;
+			moves_html += `<h1 class="move-number">${(ply >> 1) + 1}</h1>`;
 			if (ply & 1) {
 				moves_html += '<div class="move gap">&hellip;</div>';
 			}
 			have_fullmove_label = true;
 		}
 		moves_html
-			+= '<div'
-				+ ' class="move' + (
-					on_root && i === current_history_idx ? ' current' : ''
-				) + `" id="0:${i}"`
-			+ `>${getNotation(current, false)}</div>`;
+			+= '<button'
+				+ ` class="move" id="0:${i}"`
+				+ (on_this && i === current_history_idx ? 'disabled="disabled"' : '')
+			+ `>${getNotation(current, false)}</button>`;
 		if (typeof(current.adjudication) !== 'undefined') {
 			if (ply & 1) {
 				moves_html += '<div class="move gap"></div>';
@@ -957,32 +978,34 @@ const movePiece = (px, py, tx, ty, from_drag) => {
 	move.adjudication = adjudication;
 	put_move: do {
 		// why doesn't javascript have goto
-		if (current_history_idx === current_variation.length - 1) {
-			current_variation[++current_history_idx] = move;
-			break put_move;
-		}
 		const next = current_variation[current_history_idx + 1];
-		if (next.px === px && next.py === py && next.tx === tx && next.ty === ty) {
+		if (typeof(next) !== 'undefined'
+				&& next.px === px && next.py === py
+				&& next.tx === tx && next.ty === ty) {
 			current_history_idx++;
 			break put_move;
 		}
-		const prev = current_variation[current_history_idx];
+		const curr = current_variation[current_history_idx];
 		const move_numeric = getMoveNumeric(move);
-		let prev_variations;
-		if (typeof(prev.variations) === 'undefined') {
-			prev.variations = [];
-			prev_variations = prev.variations;
-		} else {
-			prev_variations = prev.variations;
-			for (let i = 0; i < prev_variations.length; i++) {
-				if (prev_variations[i][0] !== move_numeric) {
+		let curr_variations;
+		if (typeof(curr.variations) !== 'undefined') {
+			curr_variations = curr.variations;
+			for (let i = 0; i < curr_variations.length; i++) {
+				if (curr_variations[i][0] !== move_numeric) {
 					continue;
 				}
-				current_variation_id = prev_variations[i][1];
+				current_variation_id = curr_variations[i][1];
 				current_variation = move_history[current_variation_id];
 				current_history_idx = 1;
 				break put_move;
 			}
+		}
+		if (current_history_idx === current_variation.length - 1) {
+			current_variation[++current_history_idx] = move;
+			break put_move;
+		}
+		if (typeof(curr_variations) === 'undefined') {
+			curr_variations = curr.variations = [];
 		}
 		const id = getNextID();
 		move_history[id] = [
@@ -993,7 +1016,7 @@ const movePiece = (px, py, tx, ty, from_drag) => {
 			},
 			move,
 		];
-		prev.variations.push([move_numeric, id]);
+		curr.variations.push([move_numeric, id]);
 		current_variation = move_history[id];
 		current_variation_id = id;
 		current_history_idx = 1;
@@ -1227,6 +1250,9 @@ let active_icon;
 let sidebar_content;
 
 const clearActiveIcon = () => {
+	if (!active_icon) {
+		return;
+	}
 	sidebar_content.removeAttribute('style');
 	active_icon.removeAttribute('active');
 	active_icon = undefined;
@@ -1238,8 +1264,8 @@ const clearActiveIcon = () => {
  * @param {PointerEvent} e
  */
 const setActiveIcon = (e) => {
-	const icon = e.currentTarget;
-	console.log(icon);
+	e.currentTarget.blur();
+	const icon = e.currentTarget.firstChild;
 	if (active_icon === icon) {
 		clearActiveIcon();
 		return;
@@ -1248,13 +1274,39 @@ const setActiveIcon = (e) => {
 	active_icon = icon;
 	icon.setAttribute('active', 'active');
 	sidebar_content = document.getElementById(icon.id + '-content');
-	sidebar_content.style.cssText = 'display: grid;';
+	sidebar_content.style.cssText = 'display: block;';
 }
 
 Array.prototype.forEach.call(
-	document.getElementsByClassName('icon'),
-	(el) => el.addEventListener('click', setActiveIcon)
+	document.getElementsByClassName('bar-item'),
+	(el) => {
+		el.addEventListener('click', setActiveIcon);
+		el.addEventListener('mousedown', stopPropagation);
+	}
 );
+Array.prototype.forEach.call(
+	document.getElementsByClassName('sidebar-content'),
+	(el) => el.addEventListener('mousedown', stopPropagation)
+);
+
+document.getElementById('theme').addEventListener('change', (e) => {
+	const theme = e.currentTarget.value;
+	if (!theme) {
+		localStorage.removeItem(location.pathname + ':theme');
+		document.documentElement.setAttribute('theme', getSystemTheme());
+		return;
+	}
+	localStorage.setItem(location.pathname + ':theme', theme);
+	document.documentElement.setAttribute('theme', theme);
+});
+
+document.addEventListener('mousedown', (e) => {
+	if (e.button !== 0) {
+		return;
+	}
+	clearCurrentCtxmenu();
+	clearActiveIcon();
+});
 
 // // A chess pawn's approximate value in Intransitive pieces.
 // const PAWN_VALUE = 0.1861797350519155;

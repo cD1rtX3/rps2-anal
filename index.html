@@ -2,14 +2,17 @@
 <html lang="en">
 	<head>
 		<style>
-			:root {
-				background-color: #eff1f5;
-				color: #4c4f69;
+			:root {background-color: #eff1f5; color: #4c4f69;}
+			@media (prefers-contrast: more) {
+				:root {background-color: #eff1f5; color: black;}
 			}
 			@media (prefers-color-scheme: dark) {
-				:root {
-					background-color: #1e1e2e;
-					color: #cdd6f4;
+				:root {background-color: #24273a; color: #cad3f5;}
+				@media (prefers-contrast: more) {
+					:root {background-color: #11111b; color: white;}
+				}
+				@media (prefers-contrast: less) {
+					:root {background-color: #303446; color: #c6d0f5;}
 				}
 			}
 		</style>
@@ -21,17 +24,17 @@
 		<link rel="icon" href="./assets/favicon.svg">
 		<script>
 			'use strict';
-			let theme = localStorage.getItem(location.pathname + ':theme');
-			switch (theme) {
-				default:
-					if (!window.matchMedia) {
-						throw Error('Couldn\'t get system theme.');
-					}
-					theme = matchMedia('(prefers-color-scheme: dark)').matches ? 'mocha' : 'latte';
-				case 'latte':
-				case 'mocha':
-			}
-			document.documentElement.setAttribute('theme', theme);
+			window.getSystemTheme = () => matchMedia
+					? matchMedia('(prefers-color-scheme: dark)').matches
+						? matchMedia('(prefers-contrast: less)').matches
+							? 'frappe'
+							: matchMedia('(prefers-contrast: more)').matches ? 'black' : 'macchiato'
+						: matchMedia('(prefers-contrast: more)').matches ? 'cream' : 'latte'
+					: 'latte';
+			document.documentElement.setAttribute(
+				'theme',
+				localStorage.getItem(location.pathname + ':theme') || getSystemTheme()
+			);
 		</script>
 		<link rel="stylesheet" href="./index.css">
 	</head>
@@ -39,8 +42,7 @@
 		<noscript>
 			<h1>This page requires JavaScript be enabled to function.</h1>
 		</noscript>
-		<div id="outer"></div>
-		<script>document.getElementById('outer').innerHTML = `
+		<div id="outer" style="display: none;">
 			<div id="cursor-anchor"></div>
 			<div id="moves-ctxmenu" class="contextmenu"><menu>
 				<button id="m-force-var">Force into variation</button>
@@ -59,28 +61,29 @@
 			</menu></div>
 			<div class="sidebar-outer">
 				<div class="sidebar">
-					<div class="bar-item"><div class="icon" id="settings"></div></div>
+					<button class="bar-item"><svg class="icon" id="settings" viewBox="0 0 1 1">
+						<use href="./assets/gear.svg" x="0" y="0" width="1" height="1" />
+					</svg></button>
+					<div class="sidebar-content" id="settings-content"><div>
+						<p>Theme:</p>
+						<select id="theme">
+							<option value>System</option>
+							<option value="latte">Light</option>
+							<option value="frappe">Soft</option>
+							<option value="macchiato">Dark</option>
+							<option value="mocha">Night</option>
+							<option value="cream">Light+</option>
+							<option value="black">Dark+</option>
+						</select>
+					</div></div>
 				</div>
 			</div>
 			<div class="board-outer">
-				<div class="sidebar-content" id="settings-content">
-					<h1>Ceci n'est pas un elément.</h1>
-					<p>Ceci n'est pas un elément.
-					<p>Ceci n'est pas un elément.
-				</div>
-				<div id="board">
-					${[...Array(81)].map(() => '<div class="cell"></div>').join('')}
-				</div>
+				<div id="board"></div>
 				<div class="arrows-outer">
 					<div class="arrows-shell">
 						<svg id="arrows" viewBox="-0.5 -0.5 9 9">
-							<defs>
-								${[...Array(8)].map((_, i) => `
-									<marker id="arrowhead-${i}" orient="auto" overflow="visible">
-										<path d="M 0.95 0 l -3 2 v -4 Z" fill="var(--color-${i})" />
-									</marker>
-								`).join('')}
-							</defs>
+							<defs id="arrowheads" />
 							<g id="arrows-inner" />
 						</svg>
 					</div>
@@ -91,7 +94,19 @@
 					<div class="moves-outer"><div id="moves"></div></div>
 				</div>
 			</div>
-		`;</script>
+		</div>
+		<script type="module">
+			document.getElementById('outer').style.cssText = '';
+			let markers = '';
+			for (let i = 0; i < 8; i++) {
+				markers += `<marker id="arrowhead-${i}" orient="auto" overflow="visible">`
+						+ `<path d="M 0.95 0 l -3 2 v -4 Z" fill="var(--color-${i})" />`
+					+ '</marker>';
+			}
+			document.getElementById('arrowheads').innerHTML = markers;
+			document.getElementById('theme').value
+				= localStorage.getItem(location.pathname + ':theme') || '';
+		</script>
 		<script type="module" src="./index.js" defer></script>
 	</body>
 </html>
