@@ -546,7 +546,7 @@ const getMoveNumeric
 
 const navigateToMove = (variation_id, idx) => {
 	document.getElementById(`${current_variation_id}:${current_history_idx}`)
-		.removeAttribute('disabled');
+		?.removeAttribute('disabled');
 
 	if (variation_id !== '0' && idx === 0) {
 		const header = move_history[variation_id][0];
