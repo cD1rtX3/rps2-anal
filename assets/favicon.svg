@@ -24,13 +24,13 @@
 			fill: #181926;
 		}
 		.piece {
-			fill: #cdd6f4;
+			fill: #cad3f5;
 		}
 		.red {
-			fill: #eba0ac81;
+			fill: #ee99a081;
 		}
 		.blue {
-			fill: #89b4fa81;
+			fill: #7dc4e481;
 		}
 	}
 </style>
