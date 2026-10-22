@@ -21,7 +21,7 @@
 	}
 	@media (prefers-color-scheme: dark) {
 		.crust {
-			fill: #11111b;
+			fill: #181926;
 		}
 		.piece {
 			fill: #cdd6f4;
