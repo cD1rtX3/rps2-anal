@@ -688,12 +688,10 @@ const navigateToMove = (variation_id, idx) => {
 	if (idx > 0) {
 		document.getElementById(`${variation_id}:${idx}`).setAttribute('disabled', 'disabled');
 		const last_move = current_variation[current_history_idx];
-		document.getElementById(
-			getSquareName(last_move.px, last_move.py)
-		).className = 'previous cell';
-		document.getElementById(
-			getSquareName(last_move.tx, last_move.ty)
-		).className = 'previous cell';
+		document.getElementById(getSquareName(last_move.px, last_move.py)).className
+			= 'previous cell';
+		document.getElementById(getSquareName(last_move.tx, last_move.ty)).className
+			= 'previous cell';
 	}
 }
 
