@@ -1,3 +1,5 @@
+//#region Setup
+
 const preventDefault = (e) => e.preventDefault();
 document.getElementById('board').addEventListener(
 	'contextmenu',
@@ -10,24 +12,25 @@ const SCISSORS = 3;
 const BLUE = 0;
 const RED = 4;
 
-// 65 is 'A', and 49 is '1'.
-const getSquareName = (x, y) => String.fromCharCode(65 + x, 49 + y);
+// 97 is 'a', and 49 is '1'.
+const getSquareName = (x, y) => String.fromCharCode(97 + x, 49 + y);
 const getNamedSquare = (name) => ({
-	x: name.charCodeAt(0) - 65,
+	x: name.charCodeAt(0) - 97,
 	y: name.charCodeAt(1) - 49,
 });
 
-const getStartpos = () => JSON.parse(`[
-	[0, 0, 0, 0, 0, 0, 0, 0, 0],
-	[0, 0, 0, 1, 2, 0, 0, 0, 0],
-	[0, 0, 1, 2, 3, 0, 0, 0, 0],
-	[0, 1, 2, 3, 0, 0, 0, 0, 0],
-	[0, 2, 3, 0, 0, 0, 7, 6, 0],
-	[0, 0, 0, 0, 0, 7, 6, 5, 0],
-	[0, 0, 0, 0, 7, 6, 5, 0, 0],
-	[0, 0, 0, 0, 6, 5, 0, 0, 0],
-	[0, 0, 0, 0, 0, 0, 0, 0, 0]
-]`);
+const startposJSON = '['
+	+ '[0,0,0,0,0,0,0,0,0],'
+	+ '[0,0,0,1,2,0,0,0,0],'
+	+ '[0,0,1,2,3,0,0,0,0],'
+	+ '[0,1,2,3,0,0,0,0,0],'
+	+ '[0,2,3,0,0,0,7,6,0],'
+	+ '[0,0,0,0,0,7,6,5,0],'
+	+ '[0,0,0,0,7,6,5,0,0],'
+	+ '[0,0,0,0,6,5,0,0,0],'
+	+ '[0,0,0,0,0,0,0,0,0]'
++ ']';
+const getStartpos = () => JSON.parse(startposJSON);
 /** The current pieces on the board, by row (*y*), then by column (*x*). */
 let board = getStartpos();
 let red_to_move = false;
@@ -43,17 +46,22 @@ let adjudication;
  * node is the root or the location in the parent this variation is mentioned if
  * it isn't.
  *
- * Each subsequent element of the arrays is an object in the form `{px, py, tx,
- * ty, captured, rule50_before}`, where `px` and `py` are the coörds
- * of the start square, `tx` and `ty` are the coörds of the target square,
- * `captured` is the piece which was captured or zero if no piece was captured,
- * and `rule50_before` is the 100-move rule value before this move.
+ * Each subsequent element of the arrays is an object in the form `{piece, px,
+ * py, tx, ty, captured, rule50_before}`, where `piece` is a string identifying
+ * the moved piece, `px` and `py` are the coörds of the start square, `tx` and
+ * `ty` are the coörds of the target square, `captured` is the piece which was
+ * captured or zero if no piece was captured, and `rule50_before` is the
+ * 100-move rule value before this move.
  *
  * Each element of each move array past the first, along with the zeroth element
- * of the root, may additionally have a member called `variations`, which, if
+ * of the root, may additionally have a field called `variations`, which, if
  * present, is a list of pairs `[move, id]` of variations which can be branched
  * into instead of the next move, where `move` is the numeric form of the played
  * move, and `id` is the id of the variation to branch into.
+ *
+ * The last move in a variation may have a field called `adjudication`, which,
+ * if present, is the adjudication of the game after that move, with 1 being a
+ * blue win, 0 being a draw, and −1 being a red win.
  */
 const move_history = JSON.parse(
 	'{"0": [{"from_idx": 0, "depth": 0}]}'
@@ -65,23 +73,14 @@ let current_variation = move_history[current_variation_id];
 /** The index of the previous move in the current variation. */
 let current_history_idx = 0;
 
-const id_buffer = new ArrayBuffer(8);
-const id_uint64 = new BigUint64Array(id_buffer);
-const id_float64 = new Float64Array(id_buffer);
-/**
- * Counts up the floats, starting at 5e−324 and hitting every float on the way
- * to positive infinity. There are a little over 9.2 quintillion values in that
- * range, which should be enough.
- */
-const getNextID = () => {
-	id_uint64[0] += 1n;
-	return String(id_float64[0]);
-};
+let id_buffer = 0n;
+const getNextID = () => String(++id_buffer);
 
-const piece_letters = ['', 'R', 'P', 'S', undefined, 'r', 'p', 's'];
+const piece_letters = [undefined, 'R', 'P', 'S', undefined, 'r', 'p', 's'];
 const getFen = () => {
 	let board_string = '';
-	for (let y = 9; y-- > 0;) {
+	// upside-down because henhen sucks
+	for (let y = 0; y < 9; y++) {
 		let empties = 0;
 		for (let x = 0; x < 9; x++) {
 			const piece = board[y][x];
@@ -98,7 +97,7 @@ const getFen = () => {
 		if (empties) {
 			board_string += String(empties);
 		}
-		if (y > 0) {
+		if (y < 8) {
 			board_string += '/';
 		}
 	}
@@ -108,7 +107,7 @@ const getFen = () => {
 };
 
 const setSide = () => {
-	if (typeof(adjudication) !== 'undefined') {
+	if (adjudication !== undefined) {
 		Array.prototype.forEach.call(document.getElementsByClassName('stick'), (el) => {
 			el.style.cssText = 'display: none;';
 		});
@@ -116,14 +115,14 @@ const setSide = () => {
 			el.setAttribute('disabled', 'disabled');
 		});
 		if (adjudication === 1) {
-			document.getElementById('A1').innerHTML += '<span class="blue crown"></span>';
+			document.getElementById('a1').innerHTML += '<span class="blue crown"></span>';
 		} else if (adjudication === 0) {
-			document.getElementById('A1').innerHTML
+			document.getElementById('a1').innerHTML
 				+= '<span class="blue crown dove"></span>';
-			document.getElementById('I9').innerHTML
+			document.getElementById('i9').innerHTML
 				+= '<span class="red crown dove"></span>';
 		} else if (adjudication === -1) {
-			document.getElementById('I9').innerHTML += '<span class="red crown"></span>';
+			document.getElementById('i9').innerHTML += '<span class="red crown"></span>';
 		}
 		return;
 	}
@@ -241,7 +240,8 @@ const setUpBoard = () => {
 setUpBoard();
 setSide();
 
-/* ------------------------------ Context menu ------------------------------ */
+//#endregion
+//#region Context menu
 
 const cursor_anchor = document.getElementById('cursor-anchor');
 const updateCursorAnchor = (e) => {
@@ -277,7 +277,8 @@ const vm_bottom  = document.getElementById('vm-bottom');
 const vm_del     = document.getElementById('vm-del');
 
 const menuCallback = (menu) => (e) => {
-	if (!CSS.supports('position-anchor', 'auto')) {
+	e.currentTarget.blur();
+	if (!CSS.supports('position-anchor', '--cursor-anchor')) {
 		return;
 	}
 	e.preventDefault();
@@ -347,7 +348,7 @@ const freeVariationSince = (id, idx, base_id, base_idx) => {
 	if (id === current_variation_id) {
 		// THIS PLACE 'BOUT TO—
 		if (id !== base_id || base_idx <= current_history_idx) {
-			navigateToMove(base_id, base_idx - 1);
+			navigateToMove(base_id, base_idx - 1, false);
 		}
 	}
 	const variation = move_history[id];
@@ -388,7 +389,7 @@ const deleteFromHere = (e) => {
 		sel_move.variation_id,
 		sel_move.idx
 	);
-	if (typeof(sel_move.variation[sel_move.idx - 1].variations) !== 'undefined') {
+	if (sel_move.variation[sel_move.idx - 1].variations !== undefined) {
 		sel_move.variation_id = sel_move.variation[sel_move.idx - 1].variations[0][1];
 		sel_move.variation = move_history[sel_move.variation_id];
 		sel_move.idx = 1;
@@ -408,7 +409,7 @@ m_force_var.addEventListener('mouseup', (e) => {
 	}
 	const id = getNextID();
 	const prev = sel_move.variation[sel_move.idx - 1];
-	if (typeof(prev.variations) === 'undefined') {
+	if (prev.variations === undefined) {
 		prev.variations = [];
 	}
 	prev.variations.push([getMoveNumeric(sel_move.variation[sel_move.idx]), id]);
@@ -531,22 +532,18 @@ vm_up.addEventListener('mouseup', moveVariation);
 vm_down.addEventListener('mouseup', moveVariation);
 vm_bottom.addEventListener('mouseup', moveVariation);
 
-/* ------------------------------ Move history ------------------------------ */
+//#endregion
+//#region Move history
 
-const getNotation = (move, ascii) => getSquareName(move.px, move.py)
-		+ (move.captured ? ascii ? 'x' : '&times;' : ascii ? '-' : '&ndash;&NoBreak;')
+const getNotation = (move) => move.piece
+		+ (move.captured ? 'x' : '')
 		+ getSquareName(move.tx, move.ty);
-// 97 is 'a'.
-const getMoveUCI = (move) => String.fromCharCode(
-	move.px + 97, move.py + 49,
-	move.tx + 97, move.tx + 49
-);
 const getMoveNumeric
 	= (move) => move.px | (move.py << 4) | (move.tx << 8) | (move.ty << 12);
 
-const navigateToMove = (variation_id, idx) => {
+const navigateToMove = (variation_id, idx, don_t_animate) => {
 	document.getElementById(`${current_variation_id}:${current_history_idx}`)
-		?.removeAttribute('disabled');
+		?.removeAttribute('active');
 
 	if (variation_id !== '0' && idx === 0) {
 		const header = move_history[variation_id][0];
@@ -586,7 +583,7 @@ const navigateToMove = (variation_id, idx) => {
 		}
 	}
 
-	const should_animate = !matchMedia('(prefers-reduced-motion)').matches;
+	const should_animate = !don_t_animate && !matchMedia('(prefers-reduced-motion)').matches;
 	// In order to animate, we need to know where the pieces came from.
 	let old_from_new;
 	if (should_animate) {
@@ -679,26 +676,32 @@ const navigateToMove = (variation_id, idx) => {
 				el.style.cssText
 					= `transition: none; transform: translateX(${off_x}px) translateY(${off_y}px);`;
 			} else {
-				el.style.cssText = `transition: none; opacity: 0%;`;
+				el.style.cssText = `transition: none; opacity: 0;`;
 			}
 			setTimeout(() => el.removeAttribute('style'));
 		});
 	}
 
 	if (idx > 0) {
-		document.getElementById(`${variation_id}:${idx}`).setAttribute('disabled', 'disabled');
+		document.getElementById(`${variation_id}:${idx}`).setAttribute('active', 'active');
 		const last_move = current_variation[current_history_idx];
 		document.getElementById(getSquareName(last_move.px, last_move.py)).className
 			= 'previous cell';
 		document.getElementById(getSquareName(last_move.tx, last_move.ty)).className
 			= 'previous cell';
 	}
+
+	updateEvaluation();
 }
 
 const moveCallback = (e) => {
+	e.currentTarget.blur();
+	if (e.currentTarget.getAttribute('active')) {
+		return;
+	}
 	const move = e.currentTarget.id.split(':');
 	move[1] = Number(move[1]);
-	navigateToMove(...move);
+	navigateToMove(...move, false);
 };
 const getEndText = (adjudication) => {
 	switch (adjudication) {
@@ -722,17 +725,17 @@ const getVariationHTML = (id, ply) => {
 		moves_html
 			+= '<button'
 				+ ` class="variation-move" id="${id}:${i}"`
-				+ (on_this && i === current_history_idx ? 'disabled="disabled"' : '')
+				+ (on_this && i === current_history_idx ? 'active="active"' : '')
 			+ '>'
 				+ `${(ply >> 1) + 1}${ply & 1 ? '&hellip;' : '.'}&nbsp;`
-				+ getNotation(current, false)
-			+ '</span>&ZeroWidthSpace;';
-		if (typeof(current.adjudication) !== 'undefined') {
+				+ getNotation(current)
+			+ '</button>&ZeroWidthSpace;';
+		if (current.adjudication !== undefined) {
 			moves_html += '<span class="variation-move gap">'
 					+ getEndText(current.adjudication)
 				+ '</span>';
 		}
-		if (i > 1 && typeof(previous.variations) !== 'undefined') {
+		if (i > 1 && previous.variations !== undefined) {
 			moves_html += '<ul class="variation">';
 			for (const v of previous.variations) {
 				moves_html += getVariationHTML(v[1], ply);
@@ -740,7 +743,7 @@ const getVariationHTML = (id, ply) => {
 			moves_html += '</ul>';
 		}
 	}
-	if (typeof(current.variations) !== 'undefined') {
+	if (current.variations !== undefined) {
 		moves_html += '<ul class="variation">';
 		for (const v of current.variations) {
 			moves_html += getVariationHTML(v[1], ply);
@@ -773,15 +776,15 @@ const printMoves = () => {
 		moves_html
 			+= '<button'
 				+ ` class="move" id="0:${i}"`
-				+ (on_this && i === current_history_idx ? 'disabled="disabled"' : '')
-			+ `>${getNotation(current, false)}</button>`;
-		if (typeof(current.adjudication) !== 'undefined') {
+				+ (on_this && i === current_history_idx ? 'active="active"' : '')
+			+ `>${getNotation(current)}</button>`;
+		if (current.adjudication !== undefined) {
 			if (ply & 1) {
 				moves_html += '<div class="move gap"></div>';
 			}
 			moves_html += `<div class="move gap">${getEndText(current.adjudication)}</div>`;
 		}
-		if (typeof(previous.variations) !== 'undefined') {
+		if (previous.variations !== undefined) {
 			moves_html += '<div class="variation-box"><ul class="variation">';
 			for (const v of previous.variations) {
 				moves_html += getVariationHTML(v[1], ply);
@@ -790,7 +793,7 @@ const printMoves = () => {
 			have_fullmove_label = false;
 		}
 	}
-	if (typeof(current.variations) !== 'undefined') {
+	if (current.variations !== undefined) {
 		moves_html
 			+= '<div class="variation-box"'
 				+ (i === 1 ? ' style="margin: 0;"' : '')
@@ -822,19 +825,19 @@ document.addEventListener('keydown', (e) => {
 	switch (e.key) {
 		case 'ArrowLeft':
 			if (current_history_idx > 0) {
-				navigateToMove(current_variation_id, current_history_idx - 1);
+				navigateToMove(current_variation_id, current_history_idx - 1, e.repeat);
 			}
 			break;
 		case 'ArrowRight':
 			if (current_history_idx < current_variation.length - 1) {
-				navigateToMove(current_variation_id, current_history_idx + 1);
+				navigateToMove(current_variation_id, current_history_idx + 1, e.repeat);
 			}
 			break;
 		case 'Home':
-			navigateToMove('0', 0);
+			navigateToMove('0', 0, false);
 			break;
 		case 'End':
-			navigateToMove(current_variation_id, current_variation.length - 1);
+			navigateToMove(current_variation_id, current_variation.length - 1, false);
 			break;
 		case 'Escape':
 			clearCurrentCtxmenu();
@@ -842,7 +845,8 @@ document.addEventListener('keydown', (e) => {
 	}
 });
 
-/* ----------------------------- Piece movement ----------------------------- */
+//#endregion
+//#region Piece movement
 
 const couldTake = (piece, target_piece) => {
 	// The piece has to be ours.
@@ -885,8 +889,8 @@ const capture_svg = '<svg viewBox="2 2 30 30" class="dot"><path d="'
 const drawLegals = () => {
 	const active_x = active_square.x;
 	const active_y = active_square.y;
-	if (typeof(active_x) === 'undefined'
-			|| typeof(active_y) === 'undefined') {
+	if (active_x === undefined
+			|| active_y === undefined) {
 		return;
 	}
 	const piece = board[active_y][active_x];
@@ -921,7 +925,7 @@ const clearLegals = () => {
 };
 
 const movePiece = (px, py, tx, ty, from_drag) => {
-	if (typeof(adjudication) !== 'undefined') {
+	if (adjudication !== undefined) {
 		return;
 	}
 	// Pieces move like kings.
@@ -933,24 +937,53 @@ const movePiece = (px, py, tx, ty, from_drag) => {
 	if (!couldTake(piece, target_piece)) {
 		return;
 	}
-	board[py][px] = 0;
-	board[ty][tx] = piece;
-	red_to_move = !red_to_move;
-	const to_move_as_number = Number(red_to_move);
-	current_fullmove += 1 - to_move_as_number;
+	let disambig = false;
+	for (let qy = ty - 1; qy <= ty + 1; qy++) {
+		if (qy < 0 || qy > 8) {
+			continue;
+		}
+		for (let qx = tx - 1; qx <= tx + 1; qx++) {
+			if (qx < 0 || qx > 8 || (qx === px && qy === py)) {
+				continue;
+			}
+			if (board[qy][qx] === piece) {
+				disambig = true;
+				break;
+			}
+		}
+	}
+	const same_in_same_row
+		= tx - 1 >= 0 && px !== tx - 1 && board[py][tx - 1] === piece
+			|| px !== tx && board[py][tx] === piece
+			|| tx + 1 <= 8 && px !== tx + 1 && board[py][tx + 1] === piece;
+	const same_in_same_col
+		= ty - 1 >= 0 && py !== ty - 1 && board[ty - 1][px] === piece
+			|| py !== ty && board[ty]?.[px] === piece
+			|| ty + 1 <= 8 && py !== ty + 1 && board[ty + 1][px] === piece;
 	const move = {
+		piece: piece_letters[piece & 3] + (
+			same_in_same_row
+				? same_in_same_col ? getSquareName(px, py) : String.fromCharCode(97 + px)
+				: same_in_same_col
+					? String.fromCharCode(49 + py)
+					: disambig ? String.fromCharCode(97 + px) : ''
+		),
 		px: px, py: py,
 		tx: tx, ty: ty,
 		captured: target_piece,
 		rule50_before: rule50,
 	};
+	board[py][px] = 0;
+	board[ty][tx] = piece;
+	red_to_move = !red_to_move;
+	current_fullmove += 1 - Number(red_to_move);
 	rule50 = target_piece ? 0 : rule50 + 1;
 	if ((board[8][8] ^ 4) > 4) {
 		adjudication = 1;
 	} else if (board[0][0] > 4) {
 		adjudication = -1;
 	} else if (!board.some((row, y) => row.some((cell, x) => {
-			if ((cell - 1) >> 2 !== to_move_as_number) {
+			if ((cell - 1) >> 2 !== Number(red_to_move)) {
 				return false;
 			}
 			for (let uy = y - 1; uy <= y + 1; uy++) {
@@ -958,7 +991,7 @@ const movePiece = (px, py, tx, ty, from_drag) => {
 					continue;
 				}
 				for (let ux = x - 1; ux <= x + 1; ux++) {
-					if (ux < 0 || ux > 8 || (!ux && !uy)) {
+					if (ux < 0 || ux > 8 || (ux !== x && uy !== y)) {
 						continue;
 					}
 					if (couldTake(cell, board[uy][ux])) {
@@ -969,7 +1002,7 @@ const movePiece = (px, py, tx, ty, from_drag) => {
 			return false;
 		}))) {
 		// Stalemate.
-		adjudication = red_to_move ? 1 : -1;
+		adjudication = 1 - 2 * Number(red_to_move);
 	} else if (rule50 === 200) {
 		adjudication = 0;
 	}
@@ -977,7 +1010,7 @@ const movePiece = (px, py, tx, ty, from_drag) => {
 	put_move: do {
 		// why doesn't javascript have goto
 		const next = current_variation[current_history_idx + 1];
-		if (typeof(next) !== 'undefined'
+		if (next !== undefined
 				&& next.px === px && next.py === py
 				&& next.tx === tx && next.ty === ty) {
 			current_history_idx++;
@@ -986,7 +1019,7 @@ const movePiece = (px, py, tx, ty, from_drag) => {
 		const curr = current_variation[current_history_idx];
 		const move_numeric = getMoveNumeric(move);
 		let curr_variations;
-		if (typeof(curr.variations) !== 'undefined') {
+		if (curr.variations !== undefined) {
 			curr_variations = curr.variations;
 			for (let i = 0; i < curr_variations.length; i++) {
 				if (curr_variations[i][0] !== move_numeric) {
@@ -1002,7 +1035,7 @@ const movePiece = (px, py, tx, ty, from_drag) => {
 			current_variation[++current_history_idx] = move;
 			break put_move;
 		}
-		if (typeof(curr_variations) === 'undefined') {
+		if (curr_variations === undefined) {
 			curr_variations = curr.variations = [];
 		}
 		const id = getNextID();
@@ -1042,16 +1075,16 @@ const movePiece = (px, py, tx, ty, from_drag) => {
 	Array.prototype.forEach.call(document.getElementsByClassName('piece'), (el) => {
 		el.addEventListener('mousedown', dragStart);
 	});
-	if (from_drag || matchMedia?.('(prefers-reduced-motion)')?.matches) {
-		return;
+	if (!from_drag && !matchMedia?.('(prefers-reduced-motion)')?.matches) {
+		const rect = board_element.getBoundingClientRect();
+		// The board should be square.
+		const size = (rect.width - 2) / 9;
+		piece_element.style.cssText = 'transition: none; '
+				// The y-axis is inverted.
+				+ `transform: translate(${(px - tx) * size}px, ${(ty - py) * size}px);`;
+		setTimeout(() => piece_element.removeAttribute('style'));
 	}
-	const rect = board_element.getBoundingClientRect();
-	// The board should be square.
-	const size = (rect.width - 2) / 9;
-	piece_element.style.cssText = 'transition: none; '
-			// The y-axis is inverted.
-			+ `transform: translate(${(px - tx) * size}px, ${(ty - py) * size}px);`;
-	setTimeout(() => piece_element.removeAttribute('style'));
+	updateEvaluation();
 }
 
 /**
@@ -1121,16 +1154,19 @@ const dragPiece = (e) => {
 };
 document.addEventListener('mousemove', dragPiece);
 
-/* --------------------------------- Arrows --------------------------------- */
+//#endregion
+//#region Arrows
 
-const arrowCircle = (x, y, color, is_ghost) => '<circle'
+const arrowCircle = (x, y, color, is_ghost) => (
+	'<circle'
 		+ ` id="${is_ghost ? 'ghost' : `arr${x}${y}${x}${y}`}"`
 		+ (is_ghost ? 'opacity="0.707"' : '')
 		+ ` cx="${x}" cy="${y}"`
 		+ ' r="0.46875"'
 		+ ' fill="none"'
 		+ ` stroke="var(--color-${color})"`
-		+ ' stroke-width="0.0625" />';
+		+ ' stroke-width="0.0625" />'
+);
 const arrowPoint = (px, py, tx, ty, color, is_ghost) => {
 	// We have to manually subtract the stroke width from the length.
 	const w = tx - px, h = ty - py;
@@ -1158,7 +1194,7 @@ const drawArrow = (px, py, tx, ty, color) => {
 	}
 	const arrow_id = `arr${px}${py}${tx}${ty}`;
 	const entry = drawn_arrows.get(arrow_id);
-	if (typeof(entry) !== 'undefined') {
+	if (entry !== undefined) {
 		document.getElementById(arrow_id).remove();
 		if (entry === color) {
 			drawn_arrows.delete(arrow_id);
@@ -1175,7 +1211,7 @@ let ghost = {present: false};
 const drawGhost = () => {
 	const arrow_id = `arr${ghost.px}${ghost.py}${ghost.tx}${ghost.ty}`;
 	const entry = drawn_arrows.get(arrow_id);
-	if (typeof(entry) !== 'undefined') {
+	if (entry !== undefined) {
 		document.getElementById(arrow_id).setAttribute(
 			'opacity',
 			entry === ghost.color ? '0.293' : '0'
@@ -1191,7 +1227,7 @@ const drawGhost = () => {
 const eraseGhost = () => {
 	const arrow_id = `arr${ghost.px}${ghost.py}${ghost.tx}${ghost.ty}`;
 	const entry = drawn_arrows.get(arrow_id);
-	if (typeof(entry) !== 'undefined') {
+	if (entry !== undefined) {
 		document.getElementById(arrow_id).removeAttribute('opacity');
 		if (entry === ghost.color) {
 			return;
@@ -1242,7 +1278,8 @@ document.addEventListener('mouseup', (e) => {
 	drawArrow(ghost.px, ghost.py, ghost.tx, ghost.ty, ghost.color);
 });
 
-/* -------------------------------- Sidebar --------------------------------- */
+//#endregion
+//#region Sidebar
 
 let active_icon;
 let sidebar_content;
@@ -1253,24 +1290,29 @@ const clearActiveIcon = () => {
 	}
 	sidebar_content.removeAttribute('style');
 	active_icon.removeAttribute('active');
+	active_icon.parentElement.setAttribute('aria-pressed', 'false');
 	active_icon = undefined;
 }
 
 /**
  * Sets or clears the active icon.
  *
- * @param {PointerEvent} e
+ * @param {PointerEvent} e The event which caused this.
  */
 const setActiveIcon = (e) => {
 	e.currentTarget.blur();
-	const icon = e.currentTarget.firstChild;
-	if (active_icon === icon) {
+	// jank
+	const icon = e.currentTarget.children.item(0);
+	if (active_icon !== undefined) {
+		const return_after = active_icon === icon;
 		clearActiveIcon();
-		return;
+		if (return_after) {
+			return;
+		}
 	}
-	active_icon?.removeAttribute('active');
 	active_icon = icon;
 	icon.setAttribute('active', 'active');
+	e.currentTarget.setAttribute('aria-pressed', 'true');
 	sidebar_content = document.getElementById(icon.id + '-content');
 	sidebar_content.style.cssText = 'display: block;';
 }
@@ -1290,11 +1332,11 @@ Array.prototype.forEach.call(
 document.getElementById('theme').addEventListener('change', (e) => {
 	const theme = e.currentTarget.value;
 	if (!theme) {
-		localStorage.removeItem(location.pathname + ':theme');
+		setOption('theme', undefined);
 		document.documentElement.setAttribute('theme', getSystemTheme());
 		return;
 	}
-	localStorage.setItem(location.pathname + ':theme', theme);
+	setOption('theme', theme);
 	document.documentElement.setAttribute('theme', theme);
 });
 
@@ -1306,5 +1348,405 @@ document.addEventListener('mousedown', (e) => {
 	clearActiveIcon();
 });
 
-// // A chess pawn's approximate value in Intransitive pieces.
-// const PAWN_VALUE = 0.1861797350519155;
+//#endregion
+//#region Engine Options
+
+/**
+ * Converts an evaluation to a string.
+ *
+ * @param {number} cp The evaluation from the engine.
+ *
+ * @return {string} The printable eval.
+ */
+const getEvalString = (cp) => {
+	const imbalance = Math.abs(cp);
+	if (imbalance > Engine.EVAL_MAX) {
+		return '#' + (cp > 0 ? '+' : '\u2212') + String(Engine.EVAL_MATE - imbalance);
+	}
+	return (cp > 0 ? '+' : cp === 0 ? '\xB1' : '\u2212')
+		+ (
+			// magic number i pulled out of my ass
+			Math.round(imbalance * (eval_in_pieces ? 1.861797350519155 : 1))
+				* (eval_in_pieces ? 0.001 : 0.01)
+		).toPrecision(eval_in_pieces ? 4 : 3).slice(0, eval_in_pieces ? 5 : 4)
+};
+const getNPSString = (nps) => {
+	if (nps <= 0) {
+		return '0&nbsp;n/s';
+	}
+	const prefixes = ['', 'k', 'M', 'G'];
+	let exponent = Math.floor(Math.log10(nps) / 3);
+	let mantissa = nps / Math.pow(1000, exponent);
+	if (mantissa >= 999.5) {
+		mantissa = 1;
+		exponent++;
+	}
+	return mantissa.toPrecision(3) + '&nbsp;' + prefixes[exponent] + 'n/s';
+};
+let eval_depth_element = null;
+let eval_speed_element = null;
+const printEval = (evaluation) => {
+	eval_element.innerHTML
+		= getEvalString((1 - 2 * Number(red_to_move)) * evaluation.multipv[0].score);
+	eval_depth_element.innerHTML = String(evaluation.depth);
+	eval_speed_element.innerHTML = getNPSString(evaluation.nps);
+};
+
+const formatOption = (name, value) => {
+	switch (name) {
+		case 'think-time':
+			if (value === Infinity) {
+				return '&infin;&nbsp;s';
+			}
+			return (0.001 * value).toPrecision(2) + '&nbsp;s';
+		case 'tt-size':
+			return String(value) + '&nbsp;MB';
+		default:
+	}
+	return String(value);
+};
+const ariaFormatOption = (name, value) => {
+	switch (name) {
+		case 'think-time':
+			if (value === Infinity) {
+				return 'Infinite';
+			}
+			return String(0.1 * Math.round(0.01 * value))
+				+ ' second'
+				+ (value === 1000 ? '' : 's');
+		case 'tt-size':
+			return String(value) + ' megabyte' + (value === 1 ? '' : 's');
+		default:
+	}
+	throw Error('Tried to aria format non-aria option.');
+}
+
+const inPiecesFrom = (option_value) => option_value === 'pieces';
+let eval_in_pieces = inPiecesFrom(getOption('units'));
+document.getElementById('units').addEventListener('change', (e) => {
+	const value = e.currentTarget.value;
+	eval_in_pieces = inPiecesFrom(value);
+	printEval(current_variation[current_history_idx].eval ?? {
+		depth: 0,
+		nodes: 0,
+		nps: 0,
+		multipv: [{score: 0, pv: null}],
+	});
+	setOption('units', value);
+});
+
+let engine_lines = Number(getOption('lines'));
+const lines_element = document.getElementById('lines');
+document.getElementById('lines-value').innerHTML
+	= formatOption('lines', engine_lines);
+const updateLines = (value, should_update) => {
+	document.getElementById('lines-value').innerHTML = formatOption('lines', value);
+	if (!should_update || value === engine_lines) {
+		return;
+	}
+	engine_lines = value;
+	setOption('lines', String(value));
+	if (engine_loaded) {
+		if (!Engine.isThinking()) {
+			Engine.setOption('MultiPV', value);
+			Engine.resumeThinking();
+		} else {
+			(async () => {
+				await Engine.stopThinking();
+				try {
+					Engine.setOption('MultiPV', engine_lines);
+					Engine.resumeThinking();
+				} catch (_) {}
+			})();
+		}
+	}
+};
+const linesListener = () => {
+	updateLines(Number(lines_element.value), false);
+};
+lines_element.addEventListener('change', () => {
+	updateLines(Number(lines_element.value), true);
+});
+const removeLinesListener = () => {
+	document.removeEventListener('mousemove', linesListener);
+	document.removeEventListener('mouseup', removeLinesListener);
+};
+lines_element.addEventListener('mousedown', () => {
+	document.addEventListener('mousemove', linesListener);
+	document.addEventListener('mouseup', removeLinesListener);
+	setTimeout(linesListener);
+});
+
+const thinkTimeFrom = (option_value) => {
+	if (option_value >= 15) {
+		return Infinity;
+	}
+	return 1000 * 2 ** (option_value / 3);
+}
+let engine_think_time = thinkTimeFrom(Number(getOption('think-time')));
+const think_time_element = document.getElementById('think-time');
+document.getElementById('think-time-value').innerHTML
+	= formatOption('think-time', engine_think_time);
+think_time_element.ariaValueText
+	= ariaFormatOption('think-time', engine_think_time);
+const updateThinkTime = (value, should_update) => {
+	const time = thinkTimeFrom(value);
+	document.getElementById('think-time-value').innerHTML
+		= formatOption('think-time', time);
+	think_time_element.ariaValueText = ariaFormatOption('think-time', time);
+	if (!should_update || time === engine_think_time) {
+		return;
+	}
+	engine_think_time = time;
+	setOption('think-time', String(value));
+	if (engine_loaded) {
+		Engine.setThinkingTime(time);
+	}
+	if (!Engine.isThinking()
+			&& current_variation[current_history_idx].eval_time < engine_think_time) {
+		Engine.resumeThinking();
+	}
+};
+const thinkTimeListener = () => {
+	updateThinkTime(Number(think_time_element.value), false);
+};
+think_time_element.addEventListener('change', () => {
+	updateThinkTime(Number(think_time_element.value), true);
+});
+const removeThinkTimeListener = () => {
+	document.removeEventListener('mousemove', thinkTimeListener);
+	document.removeEventListener('mouseup', removeThinkTimeListener);
+};
+think_time_element.addEventListener('mousedown', () => {
+	document.addEventListener('mousemove', thinkTimeListener);
+	document.addEventListener('mouseup', removeThinkTimeListener);
+	setTimeout(thinkTimeListener);
+});
+
+let engine_tt_size = Number(getOption('tt-size'));
+const tt_size_element = document.getElementById('tt-size');
+document.getElementById('tt-size-value').innerHTML
+	= formatOption('tt-size', engine_tt_size);
+tt_size_element.ariaValueText = ariaFormatOption('tt-size', engine_tt_size);
+const updateTTSize = (value, should_update) => {
+	document.getElementById('tt-size-value').innerHTML
+		= formatOption('tt-size', value);
+	tt_size_element.ariaValueText = ariaFormatOption('tt-size', value);
+	if (!should_update || value === engine_tt_size) {
+		return;
+	}
+	engine_tt_size = value;
+	setOption('tt-size', String(value));
+	if (engine_loaded) {
+		if (!Engine.isThinking()) {
+			Engine.setOption('Hash', value);
+		} else {
+			(async () => {
+				await Engine.stopThinking();
+				try {
+					// For synchronization, it's important the global is used.
+					Engine.setOption('Hash', engine_tt_size);
+					Engine.resumeThinking();
+				} catch (_) {}
+			})();
+		}
+	}
+};
+const TTSizeListener = () => {
+	updateTTSize(Number(tt_size_element.value), false);
+};
+tt_size_element.addEventListener('change', () => {
+	updateTTSize(Number(tt_size_element.value), true);
+});
+const removeTTSizeListener = () => {
+	document.removeEventListener('mousemove', TTSizeListener);
+	document.removeEventListener('mouseup', removeTTSizeListener);
+};
+tt_size_element.addEventListener('mousedown', () => {
+	document.addEventListener('mousemove', TTSizeListener);
+	document.addEventListener('mouseup', removeTTSizeListener);
+	setTimeout(TTSizeListener);
+});
+
+let engine_threads = Number(getOption('threads'));
+const threads_element = document.getElementById('threads');
+document.getElementById('threads-value').innerHTML
+	= formatOption('threads', engine_threads);
+const updateThreads = (value, should_update) => {
+	document.getElementById('threads-value').innerHTML
+		= formatOption('threads', value);
+	if (!should_update || value === engine_threads) {
+		return;
+	}
+	engine_threads = value;
+	setOption('threads', String(value));
+	if (engine_loaded) {
+		if (!Engine.isThinking()) {
+			Engine.setOption('Threads', value);
+		} else {
+			(async () => {
+				await Engine.stopThinking();
+				try {
+					Engine.setOption('Threads', engine_threads);
+					Engine.resumeThinking();
+				} catch (_) {}
+			})();
+		}
+	}
+};
+const threadsListener = () => {
+	updateThreads(Number(threads_element.value), false);
+};
+threads_element.addEventListener('change', () => {
+	updateThreads(Number(threads_element.value), true);
+});
+const removeThreadsListener = () => {
+	document.removeEventListener('mousemove', threadsListener);
+	document.removeEventListener('mouseup', removeThreadsListener);
+};
+threads_element.addEventListener('mousedown', () => {
+	document.addEventListener('mousemove', threadsListener);
+	document.addEventListener('mouseup', removeThreadsListener);
+	setTimeout(threadsListener);
+});
+
+//#endregion
+// Engine loading must be done last.
+//#region Engine
+
+let engine_has_fataled = false;
+const engineFatal = (message) => {
+	engine_has_fataled = true;
+	document.getElementById('eval-box').innerHTML = '<h1 class="eval-error">'
+			+ 'Failed to load engine. Try reloading the page, or check the logs.'
+		+ '</h1><hr>';
+	return message;
+}
+
+const eval_element = document.getElementById('eval');
+const engine_name_element = document.getElementById('engine-name');
+const engine_depth_element = document.getElementById('engine-depth');
+
+let engine_loaded = false;
+const updateEvaluation = async () => {
+	if (!engine_loaded) {
+		return;
+	}
+	const current = current_variation[current_history_idx];
+	if ((current.eval_time ?? 0) >= engine_think_time) {
+		await Engine.stopThinking();
+		printEval(current.eval);
+		eval_speed_element.innerHTML = 'Finished';
+		return;
+	}
+	if (current.adjudication !== undefined) {
+		await Engine.stopThinking();
+		printEval(
+			{
+				depth: 1,
+				nodes: 0,
+				nps: 0,
+				multipv: [{score: adjudication ? -Engine.EVAL_MATE : 0}],
+			},
+		);
+		return;
+	}
+	Engine.sendPosition(getFen(), current_variation[current_history_idx]);
+};
+
+if (!crossOriginIsolated) {
+	throw engineFatal(Error('Not cross-origin isolated.'));
+}
+const Engine = (await import('./engine/js/engine.js')).default;
+try {
+	await Engine.init({
+		nnue_location: new URL('./engine/dist/rps-v6.nnue', import.meta.url),
+	});
+} catch (e) {
+	throw engineFatal(e);
+}
+engine_name_element.innerHTML = 'Hushhush 1.6 '
+		+ (Engine.getOptionValue('Use NNUE') === 'true' ? '640&nbsp;KB' : 'HCE');
+eval_element.innerHTML = getEvalString(0, false);
+engine_depth_element.innerHTML = 'Depth <span id="eval-depth">0</span>'
+		+ ' &middot; <span id="eval-speed">0&nbsp;n/s</span>';
+eval_depth_element = document.getElementById('eval-depth');
+eval_speed_element = document.getElementById('eval-speed');
+
+if (Engine.hasOption('Hash')) {
+	let max = Engine.getOptionMax('Hash');
+	if (max !== undefined) {
+		max = Math.min(tt_size_element.max, max);
+		tt_size_element.max = max;
+		tt_size_element.ariaValueMax
+			= String(max) + ' megabyte' + (max === 1 ? '' : 's');
+		if (Number(tt_size_element.value) > max) {
+			tt_size_element.value = String(max);
+			tt_size_element.ariaValueText = tt_size_element.ariaValueMax;
+		}
+	}
+	engine_tt_size = Engine.setOption('Hash', engine_tt_size);
+} else {
+	document.getElementById('tt-size-outer').style.cssText = "display: none;";
+}
+if (Engine.hasOption('Threads')) {
+	let max = Engine.getOptionMax('Threads');
+	if (max !== undefined) {
+		max = Math.min(threads_element.max, max);
+		threads_element.max = max;
+		if (Number(threads_element.value) > max) {
+			threads_element.value = String(max);
+		}
+	}
+	engine_threads = Engine.setOption('Threads', engine_threads);
+} else {
+	document.getElementById('threads-outer').style.cssText = 'display: none;';
+}
+if (Engine.hasOption('MultiPV')) {
+	let max = Engine.getOptionMax('MultiPV');
+	if (max !== undefined) {
+		max = Math.min(lines_element.max, max);
+		lines_element.max = max;
+		if (Number(lines_element.value) > max) {
+			lines_element.value = String(max);
+		}
+	}
+	engine_lines = Engine.setOption('MultiPV', engine_lines);
+} else {
+	document.getElementById('lines-outer').style.cssText = 'display: none;';
+}
+
+Engine.send('newgame');
+try {
+	await Engine.roundtrip('isready', 'readyok');
+} catch (e) {
+	throw engineFatal(e);
+}
+
+Engine.setThinkingTime(engine_think_time);
+Engine.onInfoUpdate = (evaluation, time_spent, pv_idx, current) => {
+	if (current.eval === undefined) {
+		current.eval = {depth: 0, nodes: 0, nps: 0, multipv: []};
+	}
+	// It would be nice if JS had goto…
+	if (current.eval.nodes <= evaluation.nodes) {
+		current.eval.multipv[pv_idx] = Object.assign({}, evaluation.multipv[pv_idx]);
+		current.eval_time = time_spent;
+		if (pv_idx !== 0) {
+			return;
+		}
+		current.eval.depth = evaluation.depth;
+		current.eval.nodes = evaluation.nodes;
+		current.eval.nps = evaluation.nps;
+	} else if (pv_idx !== 0) {
+		return;
+	}
+	printEval(evaluation);
+};
+Engine.onEvalFinished = (depth) => {
+	eval_speed_element.innerHTML = 'Finished';
+};
+Engine.sendPosition(getFen(), current_variation[current_history_idx]);
+engine_loaded = true;
+
+//#endregion

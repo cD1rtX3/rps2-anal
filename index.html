@@ -31,10 +31,36 @@
 							: matchMedia('(prefers-contrast: more)').matches ? 'black' : 'macchiato'
 						: matchMedia('(prefers-contrast: more)').matches ? 'cream' : 'latte'
 					: 'latte';
-			document.documentElement.setAttribute(
-				'theme',
-				localStorage.getItem(location.pathname + ':theme') || getSystemTheme()
-			);
+			window.getOption = (name) => {
+				const value = localStorage.getItem(location.pathname + ':' + name);
+				if (value) {
+					if (name === 'threads') {
+						return String(Math.min(max_threads, Number(value)));
+					}
+					return value;
+				}
+				switch (name) {
+					case 'think-time':
+						return '7';
+					case 'tt-size':
+						return '32';
+					case 'threads':
+						return String(max_threads);
+					case 'lines':
+						return '3';
+					default:
+				}
+				return '';
+			};
+			window.setOption = (name, value) => {
+				name = location.pathname + ':' + name;
+				if (value) {
+					localStorage.setItem(name, value);
+				} else {
+					localStorage.removeItem(name);
+				}
+			}
+			document.documentElement.setAttribute('theme', getOption('theme') || getSystemTheme());
 		</script>
 		<link rel="stylesheet" href="./index.css">
 	</head>
@@ -59,15 +85,19 @@
 				<hr>
 				<button id="vm-del">Delete from here</button>
 			</menu></div>
-			<div class="sidebar-outer">
+			<aside class="sidebar-outer">
 				<div class="sidebar">
-					<button class="bar-item"><svg class="icon" id="settings" viewBox="0 0 1 1">
-						<use href="./assets/gear.svg" x="0" y="0" width="1" height="1" />
-					</svg></button>
+					<button class="bar-item" title="Settings" aria-pressed="false">
+						<svg class="icon" id="settings" viewBox="0 0 1 1">
+							<use href="./assets/gear.svg#svg" x="0" y="0" width="1" height="1" />
+						</svg>
+					</button>
 					<div class="sidebar-content" id="settings-content">
 						<h1>Settings:</h1>
-						<div class="settings-grid">
-							<h2>Theme:</h2>
+
+						<h2>Appearance:</h2>
+						<form class="settings-grid">
+							<label for="theme">Theme:</label>
 							<select id="theme">
 								<option value>(System)
 								<option value="latte">Light
@@ -77,10 +107,120 @@
 								<option value="cream">Light&#8239;&#9681;
 								<option value="black">Dark&#8239;&#9681;
 							</select>
-						</div>
+						</form>
+
+						<h2>Engine:</h2>
+						<form class="engine settings-grid" id="engine-settings">
+							<label for="units">
+								<span>
+									Units:
+									<abbr
+										title="A “pawn” is a chess pawn, while a “piece” is an average
+Intransitive piece. One piece is worth about 5.4 pawns."
+										style="font-size: 0.75em;"
+										aria-hidden="true"
+										>(?)</abbr
+									>
+								</span>
+							</label>
+							<select id="units" value="pawns">
+								<option value>Pawns
+								<option value="pieces">Pieces
+							</select>
+							<div id="lines-outer" class="contents">
+								<label for="lines">
+									Lines:
+									<span id="lines-value" class="value" aria-hidden="true" style="width: 1ch;">
+										3
+									</span>
+								</label>
+								<div><div class="range">
+									<input type="range" id="lines" min="1" max="5" value="3">
+								</div></div>
+							</div>
+							<label for="think-time">
+								Search time:
+								<span id="think-time-value" class="value" aria-hidden="true" style="width: 5ch;">
+									5.0&nbsp;s
+								</span>
+							</label>
+							<div><div class="range">
+								<input
+									type="range"
+									id="think-time"
+									max="15"
+									value="7"
+									aria-valuemin="1 second"
+									aria-valuemax="Infinite"
+									aria-valuetext="5 seconds"
+								>
+							</div></div>
+							<div id="tt-size-outer" class="contents">
+								<label for="tt-size">
+									Memory:
+									<span id="tt-size-value" class="value" aria-hidden="true" style="width: 6ch;">
+										32&nbsp;MB
+									</span>
+								</label>
+								<div><div class="range">
+									<input
+										type="range"
+										id="tt-size"
+										min="1" max="128"
+										value="32"
+										list="tt-size-ticks"
+										aria-valuemin="1 megabyte"
+										aria-valuemax="128 megabytes"
+										aria-valuetext="32 megabytes"
+									>
+									<datalist id="tt-size-ticks">
+										<option value="1">
+										<option value="32">
+										<option value="64">
+										<option value="96">
+										<option value="128">
+									</datalist>
+								</div></div>
+							</div>
+							<div id="threads-outer" class="contents">
+								<label for="threads">
+									Threads:
+									<span id="threads-value" class="value" aria-hidden="true" style="width: 3ch;">
+										7
+									</span>
+								</label>
+								<div><div class="range">
+									<input type="range" id="threads" min="1" max="7" value="7">
+								</div></div>
+							</div>
+						</form>
+					</div>
+					<button class="bar-item" title="Credits" aria-pressed="false">
+						<svg class="icon" id="info" viewBox="0 0 1 1">
+							<use href="./assets/info.svg#svg" x="0" y="0" width="1" height="1" />
+						</svg>
+					</button>
+					<div class="sidebar-content" id="info-content">
+						<h1>Credits:</h1>
+
+						<p>Site Copyright &copy; 10 November 2026 Coarse Rosinflower. <a
+						href="https://github.com/cD1rtX3/rps2-anal" target="_blank">(Source)</a><br>
+						Hushhush Copyright &copy; 16 September 2026 Wilson &ldquo;Fengchi&rdquo; Wang,
+						2004&ndash;2022 The Stockfish developers. <a
+						href="https://github.com/FengchiW/hushhush" target="_blank">(Source)</a>
+
+						<p>This program is free software; you may redistribute and/or modify it under
+						the terms of the GNU General Public License as published by the Free Software
+						Foundation&mdash;either version 3 of the License or (at your option) any later
+						version.
+
+						<p>This program is distributed in the hope it will be useful, but WITHOUT ANY
+						WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+						PARTICULAR PURPOSE. See the <a href="https://www.gnu.org/licenses/#GPL"
+						target="_blank">GNU General Public License</a> for more details.
 					</div>
 				</div>
-			</div>
+			</aside>
 			<div class="board-outer">
 				<div id="board"></div>
 				<div class="arrows-outer">
@@ -92,14 +232,26 @@
 					</div>
 				</div>
 			</div>
-			<div class="analysis-outer">
+			<aside class="analysis-outer">
 				<div class="analysis">
+					<div id="eval-box">
+						<div class="eval-header">
+							<h1 id="eval">...</h1>
+							<div class="eval-info">
+								<p id="engine-name">Loading engine&hellip;
+								<p id="engine-depth">Depth 0 &middot; 0 n/s
+							</div>
+						</div>
+						<div id="eval-lines">
+							<!-- <div class="line"><h2>+0.01</h2>&ensp;Scd5&ensp;Sff5</div> -->
+						</div>
+						<hr>
+					</div>
 					<div class="moves-outer"><div id="moves"></div></div>
 				</div>
-			</div>
+			</aside>
 		</div>
 		<script type="module">
-			document.getElementById('outer').style.cssText = '';
 			let markers = '';
 			for (let i = 0; i < 8; i++) {
 				markers += `<marker id="arrowhead-${i}" orient="auto" overflow="visible">`
@@ -107,8 +259,22 @@
 					+ '</marker>';
 			}
 			document.getElementById('arrowheads').innerHTML = markers;
-			document.getElementById('theme').value
-				= localStorage.getItem(location.pathname + ':theme') || '';
+
+			window.max_threads = Math.max(1, (navigator?.hardwareConcurrency ?? 8) - 1);
+			document.getElementById('theme').value = getOption('theme');
+			document.getElementById('units').value = getOption('units');
+			document.getElementById('lines').value = getOption('lines');
+			document.getElementById('think-time').value = getOption('think-time');
+			document.getElementById('tt-size').value = getOption('tt-size');
+			if (max_threads === 1) {
+				document.getElementById('threads-outer').style.cssText = 'display: none;';
+			} else {
+				const threads_element = document.getElementById('threads');
+				threads_element.max = String(max_threads);
+				threads_element.value = getOption('threads');
+			}
+
+			document.getElementById('outer').style.cssText = '';
 		</script>
 		<script type="module" src="./index.js" defer></script>
 	</body>
