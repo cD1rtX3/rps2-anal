@@ -31,6 +31,7 @@
 							: matchMedia('(prefers-contrast: more)').matches ? 'black' : 'macchiato'
 						: matchMedia('(prefers-contrast: more)').matches ? 'cream' : 'latte'
 					: 'latte';
+			window.max_threads = Math.max(1, (navigator?.hardwareConcurrency ?? 8) - 1);
 			window.getOption = (name) => {
 				const value = localStorage.getItem(location.pathname + ':' + name);
 				if (value) {
@@ -45,7 +46,7 @@
 					case 'tt-size':
 						return '32';
 					case 'threads':
-						return String(max_threads);
+						return String((max_threads + 1) >> 1);
 					case 'lines':
 						return '3';
 					default:
@@ -261,7 +262,6 @@ Intransitive piece. One piece is worth about 5.4 pawns."
 			}
 			document.getElementById('arrowheads').innerHTML = markers;
 
-			window.max_threads = Math.max(1, (navigator?.hardwareConcurrency ?? 8) - 1);
 			document.getElementById('theme').value = getOption('theme');
 			document.getElementById('units').value = getOption('units');
 			document.getElementById('lines').value = getOption('lines');
