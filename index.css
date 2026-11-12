@@ -25,6 +25,7 @@
 	--color-5: #8839ef;
 	--color-6: #179299;
 	--color-7: #7c7f93;
+	--color-8: #04a5e5;
 	--surface-sel: #d9a39a;
 	--surface-1: #bcc0cc;
 	--surface-0: #ccd0da;
@@ -54,6 +55,7 @@
 	--color-5: #ca9ee6;
 	--color-6: #81c8be;
 	--color-7: #949cbb;
+	--color-8: #99d1db;
 	--surface-sel: #686777;
 	--surface-1: #51576d;
 	--surface-0: #414559;
@@ -83,6 +85,7 @@
 	--color-5: #c6a0f6;
 	--color-6: #8bd5ca;
 	--color-7: #939ab7;
+	--color-8: #91d7e3;
 	--surface-sel: #615f6f;
 	--surface-1: #494d64;
 	--surface-0: #363a4f;
@@ -112,6 +115,7 @@
 	--color-5: #cba6f7;
 	--color-6: #94e2d5;
 	--color-7: #9399b2;
+	--color-8: #89dceb;
 	--surface-sel: #5e5a68;
 	--surface-1: #45475a;
 	--surface-0: #313244;
@@ -135,6 +139,7 @@
 	--color-5: #8230e7;
 	--color-6: #048c93;
 	--color-7: #606276;
+	--color-8: #0087c6;
 	--surface-sel: var(--color-0);
 	--surface-1: #b4b7c1;
 	--move-dot: #7c7e90;
@@ -157,6 +162,7 @@
 	--color-5: #cba6f7;
 	--color-6: #94e2d5;
 	--color-7: #9399b2;
+	--color-8: #89dceb;
 	--surface-sel: #615856;
 	--surface-1: #45475a;
 	--move-dot: #555968;
@@ -241,6 +247,23 @@ input {
 }
 a {
 	color: var(--color-4);
+}
+
+.tab-nav {
+	position: absolute;
+	top: 0.5rem;
+	inset-inline-start: 0.5rem;
+	width: 0;
+	height: 0;
+	overflow: hidden;
+	/* inverted colours */
+	background-color: var(--color-4);
+	color: var(--crust);
+	font-weight: bold;
+}
+.tab-nav:focus {
+	width: auto;
+	height: auto;
 }
 
 #cursor-anchor {
@@ -371,6 +394,16 @@ a {
 	width: 100%;
 	height: 100%;
 	overflow: visible;
+	stroke-linecap: round;
+}
+/* #bestmove {
+	opacity: 70.710677%;
+}
+[theme=cream] #bestmove, [theme=black] #bestmove {
+	opacity: 100%;
+} */
+#bestmove[disabled] {
+	display: none;
 }
 
 .coord {
@@ -390,7 +423,7 @@ a {
 .column.coord {
 	left: 0.4em;
 	bottom: 0.4em;
-	/* subpixel alignment nonsense v2 */
+	/* subpixel alignment garbage */
 	transform: translate(0, 0);
 }
 .row.coord {
@@ -488,7 +521,7 @@ a {
 	justify-content: center;
 	box-sizing: content-box;
 	margin: 0;
-	text-box: cap alphabetic;
+	text-box: text alphabetic;
 	padding: 0 0.5ch;
 	min-width: 2ch;
 	height: 2em;
@@ -536,7 +569,8 @@ a {
 .move:hover, .move:focus,
 .variation-move:hover, .variation-move:focus,
 .line-move:hover, .line-move:focus {
-	box-shadow: inset 0 0 0 0.1em var(--text);
+	box-shadow: inset 0 0 0 0.083em var(--text);
+	box-shadow: inset 0 0 0 round(0.083em, 1px) var(--text);
 }
 .move[active]:hover, .variation-move[active]:hover {
 	box-shadow: none;
@@ -546,7 +580,7 @@ a {
 	cursor: default;
 }
 .move.gap:hover, .variation-move.gap:hover {
-	background-color: transparent;
+	box-shadow: none;
 }
 
 .eval-header {
@@ -581,26 +615,48 @@ a {
 	text-box: text alphabetic;
 }
 
-#eval-lines {
-	display: grid;
-	grid-template-columns: 1fr;
-	grid-auto-rows: auto;
-	gap: 1px;
-}
-#eval-lines > :last-child {
-	margin-block-end: 2px;
-}
-.line {
+#eval-lines > * {
 	position: relative;
+	margin-block-end: 2px;
 	background-color: var(--crust);
-	padding: 0.1em 0.3em;
-	padding: round(0.1em, 0.5px) 0.3em;
+	padding: 0.1em 0;
+	padding: round(0.1em, 0.5px) 0;
+	padding-inline-start: 0.25em;
 }
-.line > h2 {
+.eval-line {
+	height: calc(1.2em - 1px);
+	height: calc(1lh - 1px);
+	height: round(calc(1.2em - 1px), 1px);
+	height: round(calc(1lh - 1px), 1px);
+	overflow: hidden;
+	user-select: none;
+}
+.eval-line[open], .eval-line[focus] {
+	height: auto;
+}
+.eval-line > h2 {
 	display: inline;
 	font: 1em monospace;
 	font-weight: 600;
 	padding-inline-end: 0.25em;
+}
+.line-move {
+	display: inline-block;
+	height: calc(1.2em - 1px);
+	height: calc(1lh - 1px);
+	height: round(calc(1.2em - 1px), 1px);
+	height: round(calc(1lh - 1px), 1px);
+}
+.eval-line > svg {
+	float: inline-end;
+	margin-inline-end: 0.25em;
+	height: 1em;
+	fill: none;
+	stroke: var(--text);
+	stroke-width: 1px;
+}
+.eval-line[open] > svg {
+	transform: rotate(180deg);
 }
 
 .eval-error {
@@ -680,6 +736,9 @@ a {
 .sidebar-content > h2 {
 	margin-top: 0.5625rem;
 	margin-bottom: -0.0625rem;
+}
+.sidebar-content > h2:first-of-type {
+	margin-top: 0.5rem;
 }
 
 .settings-grid {
@@ -773,12 +832,11 @@ option:hover, option:focus {
 }
 @media not ((width >= 100vh) and (width >= 51em)) {
 	html {
-		--size: min(743px, calc(100vw - 1em));
+		--size: min(max(66.7vh, 18em), calc(100vw - 2em));
 	}
-	@supports (width: round(min(743px, calc(100vw - 1em)), 1px)) {
+	@supports (width: round(min(max(66.7vh, 18em), calc(100vw - 2em)), 1px)) {
 		html {
-			/* more subpixel alignment garbage */
-			--size: round(min(743px, calc(100vw - 1em)), 1px);
+			--size: round(min(max(66.7vh, 18em), calc(100vw - 2em)), 1px);
 		}
 	}
 	#board, .arrows-outer {

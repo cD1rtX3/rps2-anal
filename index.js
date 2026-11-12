@@ -1,3 +1,19 @@
+//#region Navigation
+
+let was_click = false;
+document.addEventListener('pointerdown', () => {was_click = true;});
+document.addEventListener('keydown', () => {was_click = false;});
+document.addEventListener('keyup', () => {was_click = false;});
+
+document.getElementById('to-moves').addEventListener('click', (e) => {
+	e.currentTarget.blur();
+	document.getElementById('moves')
+		.getElementsByTagName('button')
+		.item(0)
+		?.focus();
+});
+
+//#endregion
 //#region Setup
 
 const preventDefault = (e) => e.preventDefault();
@@ -19,18 +35,17 @@ const getNamedSquare = (name) => ({
 	y: name.charCodeAt(1) - 49,
 });
 
-const startposJSON = '['
-	+ '[0,0,0,0,0,0,0,0,0],'
-	+ '[0,0,0,1,2,0,0,0,0],'
-	+ '[0,0,1,2,3,0,0,0,0],'
-	+ '[0,1,2,3,0,0,0,0,0],'
-	+ '[0,2,3,0,0,0,7,6,0],'
-	+ '[0,0,0,0,0,7,6,5,0],'
-	+ '[0,0,0,0,7,6,5,0,0],'
-	+ '[0,0,0,0,6,5,0,0,0],'
-	+ '[0,0,0,0,0,0,0,0,0]'
-+ ']';
-const getStartpos = () => JSON.parse(startposJSON);
+const getStartpos = () => JSON.parse(`[
+	[0,0,0,0,0,0,0,0,0],
+	[0,0,0,1,2,0,0,0,0],
+	[0,0,1,2,3,0,0,0,0],
+	[0,1,2,3,0,0,0,0,0],
+	[0,2,3,0,0,0,7,6,0],
+	[0,0,0,0,0,7,6,5,0],
+	[0,0,0,0,7,6,5,0,0],
+	[0,0,0,0,6,5,0,0,0],
+	[0,0,0,0,0,0,0,0,0]
+]`);
 /** The current pieces on the board, by row (*y*), then by column (*x*). */
 let board = getStartpos();
 let red_to_move = false;
@@ -162,7 +177,7 @@ const dragStart = (e) => {
 		return;
 	}
 	if (active_square.element !== parent) {
-		active_square.element?.removeAttribute('active');
+		clearActiveSquare();
 		active_square.x = x;
 		active_square.y = y;
 		drawLegals();
@@ -924,19 +939,19 @@ const clearLegals = () => {
 	[...document.getElementsByClassName('dot')].forEach((el) => el.remove());
 };
 
-const movePiece = (px, py, tx, ty, from_drag) => {
-	if (adjudication !== undefined) {
-		return;
-	}
-	// Pieces move like kings.
-	if (px == tx && py == ty || Math.abs(tx - px) > 1 || Math.abs(ty - py) > 1) {
-		return;
-	}
-	const piece = board[py][px];
-	const target_piece = board[ty][tx];
-	if (!couldTake(piece, target_piece)) {
-		return;
-	}
+/**
+ * Gets the disambiguated name of a piece for use in algebraïc notation.
+ *
+ * @param {number[][]} board The board before the move was played.
+ * @param {number} piece The type of piece which moved.
+ * @param {number} px The origin x-coördinate.
+ * @param {number} py The origin y-coördinate.
+ * @param {number} tx The target x-coördinate.
+ * @param {number} ty The target y-coördinate.
+ *
+ * @return {string} The disambiguated name.
+ */
+const getAlgPieceName = (px, py, tx, ty, board, piece) => {
 	let disambig = false;
 	for (let qy = ty - 1; qy <= ty + 1; qy++) {
 		if (qy < 0 || qy > 8) {
@@ -960,24 +975,30 @@ const movePiece = (px, py, tx, ty, from_drag) => {
 		= ty - 1 >= 0 && py !== ty - 1 && board[ty - 1][px] === piece
 			|| py !== ty && board[ty]?.[px] === piece
 			|| ty + 1 <= 8 && py !== ty + 1 && board[ty + 1][px] === piece;
-	const move = {
-		piece: piece_letters[piece & 3] + (
-			same_in_same_row
-				? same_in_same_col ? getSquareName(px, py) : String.fromCharCode(97 + px)
-				: same_in_same_col
-					? String.fromCharCode(49 + py)
-					: disambig ? String.fromCharCode(97 + px) : ''
-		),
-		px: px, py: py,
-		tx: tx, ty: ty,
-		captured: target_piece,
-		rule50_before: rule50,
-	};
-	board[py][px] = 0;
-	board[ty][tx] = piece;
-	red_to_move = !red_to_move;
-	current_fullmove += 1 - Number(red_to_move);
-	rule50 = target_piece ? 0 : rule50 + 1;
+	return piece_letters[piece & 3] + (
+		same_in_same_row
+			? same_in_same_col ? getSquareName(px, py) : String.fromCharCode(97 + px)
+			: same_in_same_col
+				? String.fromCharCode(49 + py)
+				: disambig ? String.fromCharCode(97 + px) : ''
+	);
+};
+
+/**
+ * Fills in a move and puts it on the history tree.
+ *
+ * @param {number} px The origin x-coördinate.
+ * @param {number} py The origin y-coördinate.
+ * @param {number} tx The target x-coördinate.
+ * @param {number} ty The target y-coördinate.
+ * @param {{piece: string, captured: number, rule50_before: number}} move The
+ *     move to fill and put.
+ */
+const fillAndPutMove = (px, py, tx, ty, move) => {
+	move.px = px;
+	move.py = py;
+	move.tx = tx;
+	move.ty = ty;
 	if ((board[8][8] ^ 4) > 4) {
 		adjudication = 1;
 	} else if (board[0][0] > 4) {
@@ -1002,56 +1023,78 @@ const movePiece = (px, py, tx, ty, from_drag) => {
 			return false;
 		}))) {
 		// Stalemate.
-		adjudication = 1 - 2 * Number(red_to_move);
+		adjudication = 2 * Number(red_to_move) - 1;
 	} else if (rule50 === 200) {
 		adjudication = 0;
 	}
 	move.adjudication = adjudication;
-	put_move: do {
-		// why doesn't javascript have goto
-		const next = current_variation[current_history_idx + 1];
-		if (next !== undefined
-				&& next.px === px && next.py === py
-				&& next.tx === tx && next.ty === ty) {
-			current_history_idx++;
-			break put_move;
-		}
-		const curr = current_variation[current_history_idx];
-		const move_numeric = getMoveNumeric(move);
-		let curr_variations;
-		if (curr.variations !== undefined) {
-			curr_variations = curr.variations;
-			for (let i = 0; i < curr_variations.length; i++) {
-				if (curr_variations[i][0] !== move_numeric) {
-					continue;
-				}
-				current_variation_id = curr_variations[i][1];
-				current_variation = move_history[current_variation_id];
-				current_history_idx = 1;
-				break put_move;
+	const next = current_variation[current_history_idx + 1];
+	if (next !== undefined
+			&& next.px === px && next.py === py
+			&& next.tx === tx && next.ty === ty) {
+		current_history_idx++;
+		return;
+	}
+	const curr = current_variation[current_history_idx];
+	const move_numeric = getMoveNumeric(move);
+	let curr_variations;
+	if (curr.variations !== undefined) {
+		curr_variations = curr.variations;
+		for (let i = 0; i < curr_variations.length; i++) {
+			if (curr_variations[i][0] !== move_numeric) {
+				continue;
 			}
+			current_variation_id = curr_variations[i][1];
+			current_variation = move_history[current_variation_id];
+			current_history_idx = 1;
+			return;
 		}
-		if (current_history_idx === current_variation.length - 1) {
-			current_variation[++current_history_idx] = move;
-			break put_move;
-		}
-		if (curr_variations === undefined) {
-			curr_variations = curr.variations = [];
-		}
-		const id = getNextID();
-		move_history[id] = [
-			{
-				from: current_variation_id,
-				from_idx: current_history_idx,
-				depth: current_variation[0].depth + 1
-			},
-			move,
-		];
-		curr.variations.push([move_numeric, id]);
-		current_variation = move_history[id];
-		current_variation_id = id;
-		current_history_idx = 1;
-	} while (false);
+	}
+	if (current_history_idx === current_variation.length - 1) {
+		current_variation[++current_history_idx] = move;
+		return;
+	}
+	if (curr_variations === undefined) {
+		curr_variations = curr.variations = [];
+	}
+	const id = getNextID();
+	move_history[id] = [
+		{
+			from: current_variation_id,
+			from_idx: current_history_idx,
+			depth: current_variation[0].depth + 1
+		},
+		move,
+	];
+	curr.variations.push([move_numeric, id]);
+	current_variation = move_history[id];
+	current_variation_id = id;
+	current_history_idx = 1;
+};
+const movePiece = (px, py, tx, ty, from_drag) => {
+	if (adjudication !== undefined) {
+		return;
+	}
+	// Pieces move like kings.
+	if (px == tx && py == ty || Math.abs(tx - px) > 1 || Math.abs(ty - py) > 1) {
+		return;
+	}
+	const piece = board[py][px];
+	const target_piece = board[ty][tx];
+	if (!couldTake(piece, target_piece)) {
+		return;
+	}
+	const name = getAlgPieceName(px, py, tx, ty, board, piece);
+	board[py][px] = 0;
+	board[ty][tx] = piece;
+	red_to_move = !red_to_move;
+	current_fullmove += 1 - Number(red_to_move);
+	fillAndPutMove(px, py, tx, ty, {
+		piece: name,
+		captured: target_piece,
+		rule50_before: rule50,
+	});
+	rule50 = target_piece ? 0 : rule50 + 1;
 	// TODO: immediate mode garbage
 	printMoves();
 
@@ -1167,22 +1210,22 @@ const arrowCircle = (x, y, color, is_ghost) => (
 		+ ` stroke="var(--color-${color})"`
 		+ ' stroke-width="0.0625" />'
 );
-const arrowPoint = (px, py, tx, ty, color, is_ghost) => {
+const arrowPoint = (px, py, tx, ty, color, is_ghost, width, anon) => {
+	width *= 0.15625;
 	// We have to manually subtract the stroke width from the length.
 	const w = tx - px, h = ty - py;
-	const norm = 0.15625 / Math.hypot(w, h);
+	const norm = width / Math.hypot(w, h);
 	return '<line'
-		+ ` id="${is_ghost ? 'ghost' : `arr${px}${py}${tx}${ty}`}"`
+		+ (anon ? '' : ` id="${is_ghost ? 'ghost' : `arr${px}${py}${tx}${ty}`}"`)
 		+ (
 			tx < 0 || tx > 8 || ty < 0 || ty > 8
-				? 'opacity="0.293"'
-				: is_ghost ? 'opacity="0.707"' : ''
+				? ' opacity="0.29289323"'
+				: is_ghost ? ' opacity="0.70710677"' : ''
 		)
 		+ ` x1="${px}" y1="${py}"`
 		+ ` x2="${tx - w * norm}" y2="${ty - h * norm}"`
 		+ ` stroke="var(--color-${color})"`
-		+ ' stroke-width="0.15625"'
-		+ ' stroke-linecap="round"'
+		+ ` stroke-width="${width}"`
 		+ ` marker-end="url(#arrowhead-${color})" />`;
 };
 
@@ -1204,7 +1247,7 @@ const drawArrow = (px, py, tx, ty, color) => {
 	drawn_arrows.set(arrow_id, color);
 	arrow_element.innerHTML += px === tx && py === ty
 			? arrowCircle(px, py, color, false)
-			: arrowPoint(px, py, tx, ty, color, false);
+			: arrowPoint(px, py, tx, ty, color, false, 1, false);
 };
 
 let ghost = {present: false};
@@ -1214,7 +1257,7 @@ const drawGhost = () => {
 	if (entry !== undefined) {
 		document.getElementById(arrow_id).setAttribute(
 			'opacity',
-			entry === ghost.color ? '0.293' : '0'
+			entry === ghost.color ? '0.29289323' : '0'
 		);
 		if (entry === ghost.color) {
 			return;
@@ -1222,7 +1265,9 @@ const drawGhost = () => {
 	}
 	arrow_element.innerHTML += ghost.px === ghost.tx && ghost.py === ghost.ty
 			? arrowCircle(ghost.px, ghost.py, ghost.color, true)
-			: arrowPoint(ghost.px, ghost.py, ghost.tx, ghost.ty, ghost.color, true);
+			: arrowPoint(
+				ghost.px, ghost.py, ghost.tx, ghost.ty, ghost.color, true, 1, false
+			);
 };
 const eraseGhost = () => {
 	const arrow_id = `arr${ghost.px}${ghost.py}${ghost.tx}${ghost.ty}`;
@@ -1349,7 +1394,22 @@ document.addEventListener('mousedown', (e) => {
 });
 
 //#endregion
-//#region Engine Options
+//#region Accuracy
+
+const getWinChance = (cp) => {
+	if (Math.abs(cp) > 32000) {
+		return Number(cp >= 0);
+	}
+	return 0.5 + 0.5 * (2 / (1 + Math.exp(-0.00368208 * cp)) - 1);
+}
+const getMoveAccuracy = (win_before, win_after) => (
+	1.031668 * Math.exp(-4.354 * (win_before - win_after)) - 0.031669
+);
+
+//#endregion
+//#region Engine Display
+
+let engine_loaded = false;
 
 /**
  * Converts an evaluation to a string.
@@ -1359,6 +1419,7 @@ document.addEventListener('mousedown', (e) => {
  * @return {string} The printable eval.
  */
 const getEvalString = (cp) => {
+	cp *= 1 - 2 * Number(red_to_move);
 	const imbalance = Math.abs(cp);
 	if (imbalance > Engine.EVAL_MAX) {
 		return '#' + (cp > 0 ? '+' : '\u2212') + String(Engine.EVAL_MATE - imbalance);
@@ -1383,13 +1444,200 @@ const getNPSString = (nps) => {
 	}
 	return mantissa.toPrecision(3) + '&nbsp;' + prefixes[exponent] + 'n/s';
 };
+const eval_element = document.getElementById('eval');
+const engine_name_element = document.getElementById('engine-name');
+const engine_depth_element = document.getElementById('engine-depth');
 let eval_depth_element = null;
 let eval_speed_element = null;
+
 const printEval = (evaluation) => {
-	eval_element.innerHTML
-		= getEvalString((1 - 2 * Number(red_to_move)) * evaluation.multipv[0].score);
+	eval_element.innerHTML = getEvalString(evaluation.multipv[0].score);
 	eval_depth_element.innerHTML = String(evaluation.depth);
 	eval_speed_element.innerHTML = getNPSString(evaluation.nps);
+};
+const engine_preview_element = document.getElementById('engine-preview');
+const bestmove_element = document.getElementById('bestmove');
+const clearEnginePreview = () => {
+	engine_preview_element.innerHTML = '';
+	bestmove_element.removeAttribute('style');
+}
+const lineMoveMouseOver = (e) => {
+	const {[0]: line_no, [1]: idx}
+		= e.currentTarget.id.split(':').splice(1).map(Number);
+	const pv = current_variation[current_history_idx].eval.multipv[line_no].pv;
+	let arrows = '';
+	for (let i = 0; i <= idx; i++) {
+		const numeric = pv[i];
+		arrows += arrowPoint(
+			(numeric & 15),
+			8 - ((numeric >> 4) & 15),
+			((numeric >> 8) & 15),
+			8 - (numeric >> 12),
+			8, false, 1, true
+		);
+	}
+	bestmove_element.style.cssText = 'display: none;';
+	engine_preview_element.innerHTML = arrows;
+};
+const lineMoveFocus = (e) => {
+	if (was_click) {
+		return;
+	}
+	document.getElementById('line-' + String(e.currentTarget.id.split(':')[1]))
+		.setAttribute('focus', 'focus');
+};
+const lineMoveBlur = (e) => {
+	document.getElementById('line-' + String(e.currentTarget.id.split(':')[1]))
+		.removeAttribute('focus');
+};
+const lineMoveMouseUp = (e) => {
+	const {[0]: line_no, [1]: idx}
+		= e.currentTarget.id.split(':').splice(1).map(Number);
+	const pv = current_variation[current_history_idx].eval.multipv[line_no].pv;
+	const variation_id_before = current_variation_id;
+	const variation_before = current_variation;
+	const history_idx_before = current_history_idx;
+	const board_before = JSON.parse(JSON.stringify(board));
+	const red_to_move_before = red_to_move;
+	const fullmove_before = current_fullmove;
+	for (let i = 0; i <= idx; i++) {
+		const numeric = pv[i];
+		const px = numeric & 15;
+		const py = (numeric >> 4) & 15;
+		const tx = (numeric >> 8) & 15;
+		const ty = numeric >> 12;
+		const piece = board[py][px];
+		const target_piece = board[ty][tx];
+		const name = getAlgPieceName(px, py, tx, ty, board, piece);
+		board[ty][tx] = piece;
+		red_to_move = !red_to_move;
+		current_fullmove += 1 - Number(red_to_move);
+		fillAndPutMove(px, py, tx, ty, {
+			piece: name,
+			captured: target_piece,
+			rule50_before: rule50,
+		});
+		rule50 = target_piece ? 0 : rule50 + 1;
+	}
+	const variation_id_after = current_variation_id;
+	const history_idx_after = current_history_idx;
+	current_variation_id = variation_id_before;
+	current_variation = variation_before;
+	current_history_idx = history_idx_before;
+	board = board_before;
+	red_to_move = red_to_move_before;
+	current_fullmove = fullmove_before;
+	printMoves();
+	navigateToMove(variation_id_after, history_idx_after, false);
+};
+const printLine = (line, line_no) => {
+	if (!line || !line.pv || !line.pv.length) {
+		return;
+	}
+	const line_element = document.getElementById('line-' + String(line_no));
+	if (!line_element) {
+		return;
+	}
+	let line_html = '<svg viewbox="0 0 6 8" aria-hidden="true">'
+				+ '<path d="M 1 3 l 2 2 l 2 -2" />'
+			+ '</svg>'
+			+ `<h2>${getEvalString(line.score)}</h2>`;
+	const board_clone = JSON.parse(JSON.stringify(board));
+	const pv = line.pv;
+	let i = 0;
+	let fullmove_clone = current_fullmove;
+	let red_to_move_clone = red_to_move;
+	// messed up and evil `for` loop
+	while (true) {
+		const numeric = pv[i];
+		const px = numeric & 15;
+		const py = (numeric >> 4) & 15;
+		const tx = (numeric >> 8) & 15;
+		const ty = numeric >> 12;
+		const piece = board_clone[py][px];
+		line_html += `<button id="lmove:${line_no}:${i}" class="line-move">`
+				+ (
+					i !== 0 && !red_to_move_clone
+						? `${fullmove_clone}.&nbsp;`
+						: ''
+				)
+				+ getAlgPieceName(px, py, tx, ty, board_clone, piece)
+				+ (board_clone[ty][tx] ? 'x' : '')
+				+ getSquareName(tx, ty)
+			+ '</button>';
+		fullmove_clone += Number(red_to_move_clone);
+		red_to_move_clone = !red_to_move_clone;
+		i++;
+		if (i >= pv.length) {
+			break;
+		}
+		board_clone[py][px] = 0;
+		board_clone[ty][tx] = piece;
+	}
+	clearEnginePreview();
+	line_element.innerHTML = line_html;
+	Array.prototype.forEach.call(
+		line_element.getElementsByClassName('line-move'),
+		(el) => {
+			el.addEventListener('mousedown', stopPropagation)
+			el.addEventListener('mouseup', lineMoveMouseUp, {once: true});
+			el.addEventListener('mouseover', lineMoveMouseOver);
+			el.addEventListener('mouseout', clearEnginePreview);
+			el.addEventListener('focus', lineMoveFocus);
+			el.addEventListener('blur', lineMoveBlur);
+		}
+	);
+};
+
+let opened_line = -1;
+const lineMouseDown = (e) => {
+	const line_no = Number(e.currentTarget.id.slice(5));
+	if (opened_line === line_no) {
+		document.getElementById('line-' + String(line_no)).removeAttribute('open');
+		opened_line = -1;
+		return;
+	}
+	if (opened_line >= 0) {
+		document.getElementById('line-' + String(opened_line)).removeAttribute('open');
+	}
+	document.getElementById('line-' + String(line_no)).setAttribute('open', 'open');
+	opened_line = line_no;
+};
+const clearLines = () => {
+	let lines_html = '';
+	for (let i = 0; i < engine_lines; i++) {
+		lines_html += `<div><div id="line-${i}" class="eval-line"></div></div>`;
+	}
+	clearEnginePreview();
+	document.getElementById('eval-lines').innerHTML = lines_html;
+	opened_line = -1;
+	Array.prototype.forEach.call(
+		document.getElementsByClassName('eval-line'),
+		(el) => {el.addEventListener('mousedown', lineMouseDown);}
+	);
+};
+
+const drawBestmoves = (multipv) => {
+	const optimum = getWinChance(multipv[0].score);
+	bestmove_element.innerHTML = multipv.map((v, i) => {
+		if (!v.pv) {
+			return;
+		}
+		const numeric = v.pv[0];
+		const accuracy = getMoveAccuracy(optimum, getWinChance(v.score))
+		if (accuracy < 0.5) {
+			return '';
+		}
+		return arrowPoint(
+			(numeric & 15),
+			8 - ((numeric >> 4) & 15),
+			((numeric >> 8) & 15),
+			8 - (numeric >> 12),
+			8, false,
+			i === 0 ? 1 : Math.SQRT1_2 * accuracy * accuracy,
+			true
+		);
+	}).join('');
 };
 
 const formatOption = (name, value) => {
@@ -1419,7 +1667,46 @@ const ariaFormatOption = (name, value) => {
 		default:
 	}
 	throw Error('Tried to aria format non-aria option.');
-}
+};
+
+const updateEvaluation = async () => {
+	if (!engine_loaded) {
+		return;
+	}
+	const current = current_variation[current_history_idx];
+	if (current.eval_time !== undefined
+			&& current.eval_time >= engine_think_time
+			&& current.eval.multipv.length >= engine_lines) {
+		await Engine.stopThinking();
+		printEval(current.eval);
+		eval_speed_element.innerHTML = 'Finished';
+		clearLines();
+		current.eval.multipv.forEach(printLine);
+		drawBestmoves(current.eval.multipv);
+		return;
+	}
+	if (current.adjudication !== undefined) {
+		await Engine.stopThinking();
+		printEval(
+			{
+				depth: 1,
+				nodes: 0,
+				nps: 0,
+				multipv: [{score: adjudication ? -Engine.EVAL_MATE : 0}],
+			},
+		);
+		eval_speed_element.innerHTML = 'Finished';
+		clearLines();
+		bestmove_element.innerHTML = '';
+		return;
+	}
+	clearLines();
+	bestmove_element.innerHTML = '';
+	Engine.sendPosition(getFen(), current_variation[current_history_idx]);
+};
+
+//#endregion
+//#region Engine Options
 
 const inPiecesFrom = (option_value) => option_value === 'pieces';
 let eval_in_pieces = inPiecesFrom(getOption('units'));
@@ -1446,20 +1733,23 @@ const updateLines = (value, should_update) => {
 	}
 	engine_lines = value;
 	setOption('lines', String(value));
-	if (engine_loaded) {
-		if (!Engine.isThinking()) {
-			Engine.setOption('MultiPV', value);
-			Engine.resumeThinking();
-		} else {
-			(async () => {
-				await Engine.stopThinking();
-				try {
-					Engine.setOption('MultiPV', engine_lines);
-					Engine.resumeThinking();
-				} catch (_) {}
-			})();
-		}
+	if (!engine_loaded) {
+		return;
 	}
+	if (!Engine.isThinking()) {
+		Engine.setOption('MultiPV', value);
+		clearLines();
+		Engine.resumeThinking();
+		return;
+	}
+	(async () => {
+		await Engine.stopThinking();
+		try {
+			Engine.setOption('MultiPV', engine_lines);
+			clearLines();
+			Engine.resumeThinking();
+		} catch (_) {}
+	})();
 };
 const linesListener = () => {
 	updateLines(Number(lines_element.value), false);
@@ -1612,7 +1902,7 @@ threads_element.addEventListener('mousedown', () => {
 
 //#endregion
 // Engine loading must be done last.
-//#region Engine
+//#region Engine Loading
 
 let engine_has_fataled = false;
 const engineFatal = (message) => {
@@ -1621,37 +1911,6 @@ const engineFatal = (message) => {
 			+ 'Failed to load engine. Try reloading the page, or check the logs.'
 		+ '</h1><hr>';
 	return message;
-}
-
-const eval_element = document.getElementById('eval');
-const engine_name_element = document.getElementById('engine-name');
-const engine_depth_element = document.getElementById('engine-depth');
-
-let engine_loaded = false;
-const updateEvaluation = async () => {
-	if (!engine_loaded) {
-		return;
-	}
-	const current = current_variation[current_history_idx];
-	if ((current.eval_time ?? 0) >= engine_think_time) {
-		await Engine.stopThinking();
-		printEval(current.eval);
-		eval_speed_element.innerHTML = 'Finished';
-		return;
-	}
-	if (current.adjudication !== undefined) {
-		await Engine.stopThinking();
-		printEval(
-			{
-				depth: 1,
-				nodes: 0,
-				nps: 0,
-				multipv: [{score: adjudication ? -Engine.EVAL_MATE : 0}],
-			},
-		);
-		return;
-	}
-	Engine.sendPosition(getFen(), current_variation[current_history_idx]);
 };
 
 if (!crossOriginIsolated) {
@@ -1728,8 +1987,13 @@ Engine.onInfoUpdate = (evaluation, time_spent, pv_idx, current) => {
 	if (current.eval === undefined) {
 		current.eval = {depth: 0, nodes: 0, nps: 0, multipv: []};
 	}
+	printLine(evaluation.multipv[pv_idx], pv_idx);
+	if (current === current_variation[current_history_idx]) {
+		drawBestmoves(evaluation.multipv);
+	}
 	// It would be nice if JS had goto…
 	if (current.eval.nodes <= evaluation.nodes) {
+		// Only works because `engine.js` creates a new `pv` array for each command.
 		current.eval.multipv[pv_idx] = Object.assign({}, evaluation.multipv[pv_idx]);
 		current.eval_time = time_spent;
 		if (pv_idx !== 0) {
@@ -1746,6 +2010,7 @@ Engine.onInfoUpdate = (evaluation, time_spent, pv_idx, current) => {
 Engine.onEvalFinished = (depth) => {
 	eval_speed_element.innerHTML = 'Finished';
 };
+clearLines();
 Engine.sendPosition(getFen(), current_variation[current_history_idx]);
 engine_loaded = true;
 

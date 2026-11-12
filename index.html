@@ -69,6 +69,7 @@
 			<h1>This page requires JavaScript be enabled to function.</h1>
 		</noscript>
 		<div id="outer" style="display: none;">
+			<button id="to-moves" class="tab-nav">Skip to moves</button>
 			<div id="cursor-anchor"></div>
 			<div id="moves-ctxmenu" class="contextmenu"><menu>
 				<button id="m-force-var">Force into variation</button>
@@ -227,7 +228,9 @@ Intransitive piece. One piece is worth about 5.4 pawns."
 					<div class="arrows-shell">
 						<svg id="arrows" viewBox="-0.5 -0.5 9 9">
 							<defs id="arrowheads" />
+							<g id="bestmove" />
 							<g id="arrows-inner" />
+							<g id="engine-preview" />
 						</svg>
 					</div>
 				</div>
@@ -242,9 +245,7 @@ Intransitive piece. One piece is worth about 5.4 pawns."
 								<p id="engine-depth">Depth 0 &middot; 0 n/s
 							</div>
 						</div>
-						<div id="eval-lines">
-							<!-- <div class="line"><h2>+0.01</h2>&ensp;Scd5&ensp;Sff5</div> -->
-						</div>
+						<div id="eval-lines"></div>
 						<hr>
 					</div>
 					<div class="moves-outer"><div id="moves"></div></div>
@@ -253,7 +254,7 @@ Intransitive piece. One piece is worth about 5.4 pawns."
 		</div>
 		<script type="module">
 			let markers = '';
-			for (let i = 0; i < 8; i++) {
+			for (let i = 0; i <= 8; i++) {
 				markers += `<marker id="arrowhead-${i}" orient="auto" overflow="visible">`
 						+ `<path d="M 0.95 0 l -3 2 v -4 Z" fill="var(--color-${i})" />`
 					+ '</marker>';

@@ -319,7 +319,7 @@ export default class Engine {
 			updated = true;
 			Engine.#eval.nps = info.nps;
 		}
-		if (info.score !== undefined && Engine.#eval.multipv[line_no].score !== info.score) {
+		if (info.score !== undefined) {
 			updated = true;
 			Engine.#eval.multipv[line_no].score = info.score;
 			if (info.pv !== undefined) {
