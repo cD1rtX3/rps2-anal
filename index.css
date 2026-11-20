@@ -376,7 +376,7 @@ a {
 
 .arrows-outer {
 	position: absolute;
-	z-index: 10;
+	z-index: 9;
 	aspect-ratio: 1;
 	pointer-events: none;
 	padding: 0.5rem;
@@ -396,12 +396,6 @@ a {
 	overflow: visible;
 	stroke-linecap: round;
 }
-/* #bestmove {
-	opacity: 70.710677%;
-}
-[theme=cream] #bestmove, [theme=black] #bestmove {
-	opacity: 100%;
-} */
 #bestmove[disabled] {
 	display: none;
 }

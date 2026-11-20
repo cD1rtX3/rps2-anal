@@ -33,7 +33,7 @@
 					: 'latte';
 			window.max_threads = Math.max(1, (navigator?.hardwareConcurrency ?? 8) - 1);
 			window.getOption = (name) => {
-				const value = localStorage.getItem(location.pathname + ':' + name);
+				const value = localStorage.getItem('/rps2-anal/:' + name);
 				if (value) {
 					if (name === 'threads') {
 						return String(Math.min(max_threads, Number(value)));
@@ -54,11 +54,10 @@
 				return '';
 			};
 			window.setOption = (name, value) => {
-				name = location.pathname + ':' + name;
 				if (value) {
-					localStorage.setItem(name, value);
+					localStorage.setItem('/rps2-anal/:' + name, value);
 				} else {
-					localStorage.removeItem(name);
+					localStorage.removeItem('/rps2-anal/:' + name);
 				}
 			}
 			document.documentElement.setAttribute('theme', getOption('theme') || getSystemTheme());
@@ -197,6 +196,15 @@ Intransitive piece. One piece is worth about 5.4 pawns."
 							</div>
 						</form>
 					</div>
+					<button class="bar-item" title="Save/Load" aria-pressed="false">
+						<svg class="icon" id="file" viewBox="0 0 1 1">
+							<use href="./assets/folder.svg#svg" x="0" y="0" width="1" height="1" />
+						</svg>
+					</button>
+					<div class="sidebar-content" id="file-content">
+						<h1>Ceci n'est pas un élement.</h1>
+						<p>Ceci n'est pas un élement.
+					</div>
 					<button class="bar-item" title="Credits" aria-pressed="false">
 						<svg class="icon" id="info" viewBox="0 0 1 1">
 							<use href="./assets/info.svg#svg" x="0" y="0" width="1" height="1" />
@@ -205,7 +213,7 @@ Intransitive piece. One piece is worth about 5.4 pawns."
 					<div class="sidebar-content" id="info-content">
 						<h1>Credits:</h1>
 
-						<p>Site Copyright &copy; 12 November 2026 Coarse Rosinflower. <a
+						<p>Site Copyright &copy; 20 November 2026 Coarse Rosinflower. <a
 						href="https://github.com/cD1rtX3/rps2-anal" target="_blank">(Source)</a><br>
 						Hushhush Copyright &copy; 16 September 2026 Wilson &ldquo;Fengchi&rdquo; Wang,
 						2004&ndash;2022 The Stockfish developers. <a

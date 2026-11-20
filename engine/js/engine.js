@@ -138,6 +138,8 @@ export default class Engine {
 		);
 	}
 	static #startThinking(time) {
+		Engine.#eval.depth = Engine.#eval.nodes = Engine.#eval.nps = 0;
+		Engine.#eval.multipv.forEach((v) => {v.score = 0; v.pv = null});
 		Engine.send('go infinite');
 		Engine.#thinking = 1;
 		Engine.#started_thinking_at = performance.now();
@@ -177,10 +179,6 @@ export default class Engine {
 	 */
 	static async sendPosition(fen, args) {
 		await Engine.stopThinking();
-
-		Engine.#eval.depth = Engine.#eval.nodes = Engine.#eval.nps = 0;
-		Engine.#eval.multipv.forEach((v) => {v.score = 0; v.pv = null});
-
 		Engine.send('position fen ' + fen);
 		Engine.#info_update_args = args;
 		Engine.#startThinking();
@@ -632,7 +630,7 @@ export default class Engine {
 		Engine.#listeners.delete(Engine.#option_listener);
 		await Engine.roundtrip('isready', 'readyok');
 
-		// Hushhush needs Engine to be first.
+		// Hushhush needs this to be first.
 		Engine.setOption('UCI_Variant', 'rps-v6');
 		if (options.nnue_location !== undefined) {
 			if (!(options.nnue_location instanceof URL)) {

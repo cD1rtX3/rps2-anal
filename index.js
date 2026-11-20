@@ -35,24 +35,24 @@ const getNamedSquare = (name) => ({
 	y: name.charCodeAt(1) - 49,
 });
 
-const getStartpos = () => JSON.parse(`[
-	[0,0,0,0,0,0,0,0,0],
-	[0,0,0,1,2,0,0,0,0],
-	[0,0,1,2,3,0,0,0,0],
-	[0,1,2,3,0,0,0,0,0],
-	[0,2,3,0,0,0,7,6,0],
-	[0,0,0,0,0,7,6,5,0],
-	[0,0,0,0,7,6,5,0,0],
-	[0,0,0,0,6,5,0,0,0],
-	[0,0,0,0,0,0,0,0,0]
-]`);
+const getStartpos = () => new Int8Array(JSON.parse('[\
+	0,0,0,0,0,0,0,0,0,\
+	0,0,0,1,2,0,0,0,0,\
+	0,0,1,2,3,0,0,0,0,\
+	0,1,2,3,0,0,0,0,0,\
+	0,2,3,0,0,0,7,6,0,\
+	0,0,0,0,0,7,6,5,0,\
+	0,0,0,0,7,6,5,0,0,\
+	0,0,0,0,6,5,0,0,0,\
+	0,0,0,0,0,0,0,0,0\
+]'));
 /** The current pieces on the board, by row (*y*), then by column (*x*). */
 let board = getStartpos();
 let red_to_move = false;
 let current_fullmove = 1;
-let starting_fullmove = 1;
 let rule50 = 0;
 let adjudication;
+const empty_move_tree = '{"0":[{"from_idx":0,"depth":0}]}';
 /**
  * A map from numeric variation IDs to arrays of moves. The zeroth element of
  * each array is an object in the form `{depth, from, from_idx}`, where `depth`
@@ -68,19 +68,23 @@ let adjudication;
  * captured or zero if no piece was captured, and `rule50_before` is the
  * 100-move rule value before this move.
  *
- * Each element of each move array past the first, along with the zeroth element
- * of the root, may additionally have a field called `variations`, which, if
- * present, is a list of pairs `[move, id]` of variations which can be branched
- * into instead of the next move, where `move` is the numeric form of the played
- * move, and `id` is the id of the variation to branch into.
+ * Each element of each move array past the first along with the zeroth element
+ * of the root, may additionally have fields called `variations`, `eval_time`,
+ * and/or `eval`. If present: `variations` is a list of pairs `[move, id]` of
+ * variations which can be branched into instead of the next move, where `move`
+ * is the numeric form of the played move, and `id` is the id of the variation
+ * to branch into; `eval_time` is the time spent on the evaluation; and `eval`
+ * is an object in the form `{depth, nodes, nps, multipv}`, where `depth` is the
+ * depth of the evaluation, `nodes` is the node count of the evaluation, `nps`
+ * is the speed of the evaluation in nodes per second, and `multipv` is an array
+ * of lines where each element is in the form `{score, pv}`, where `score` is
+ * the score in centipawns, and `pv` is an array of moves in numeric form.
  *
  * The last move in a variation may have a field called `adjudication`, which,
  * if present, is the adjudication of the game after that move, with 1 being a
  * blue win, 0 being a draw, and −1 being a red win.
  */
-const move_history = JSON.parse(
-	'{"0": [{"from_idx": 0, "depth": 0}]}'
-);
+let move_history = JSON.parse(empty_move_tree);
 /** The ID of the variation we are in. */
 let current_variation_id = '0';
 /** A reference to the variation we are in. */
@@ -98,7 +102,7 @@ const getFen = () => {
 	for (let y = 0; y < 9; y++) {
 		let empties = 0;
 		for (let x = 0; x < 9; x++) {
-			const piece = board[y][x];
+			const piece = board[9 * y + x];
 			if (!piece) {
 				empties++;
 				continue;
@@ -145,7 +149,7 @@ const setSide = () => {
 	const opponent = red_to_move ? 'blue ' : 'red ';
 	document.getElementsByClassName(opponent + 'stick').item(0).style.cssText
 		= 'display: none;';
-	if (board[red_to_move ? 8 : 0][red_to_move ? 8 : 0]) {
+	if (board[red_to_move ? 80 : 0]) {
 		document.getElementsByClassName(to_move + 'stick')
 			.item(0).style.cssText = 'pointer-events: none;';
 	} else {
@@ -173,7 +177,7 @@ const dragStart = (e) => {
 	}
 	const parent = e.currentTarget.parentElement;
 	const {x, y} = getNamedSquare(parent.id);
-	if (!(board[y][x] & 4) === red_to_move) {
+	if (!(board[9 * y + x] & 4) === red_to_move) {
 		return;
 	}
 	if (active_square.element !== parent) {
@@ -196,7 +200,7 @@ const setUpBoard = () => {
 	// The top of the board is the last row.
 	for (let y = 9; y-- > 0;) {
 		for (let x = 0; x < 9; x++) {
-			const piece = board[y][x];
+			const piece = board[9 * y + x];
 			const cell_name = getSquareName(x, y);
 			board_html
 				+= `<div class="cell" id="${cell_name}">`
@@ -602,7 +606,7 @@ const navigateToMove = (variation_id, idx, don_t_animate) => {
 	// In order to animate, we need to know where the pieces came from.
 	let old_from_new;
 	if (should_animate) {
-		old_from_new = new Int8Array(81).map((_, i) => board[Math.floor(i / 9)][i % 9] ? i : -1);
+		old_from_new = new Int8Array(81).map((_, i) => board[i] ? i : -1);
 	}
 
 	const stepForward = () => {
@@ -615,9 +619,9 @@ const navigateToMove = (variation_id, idx, don_t_animate) => {
 			old_from_new[9 * item.ty + item.tx] = old_from_new[old];
 			old_from_new[old] = -1;
 		}
-		rule50 = board[item.ty][item.tx] ? 0 : rule50 + 1;
-		board[item.ty][item.tx] = board[item.py][item.px];
-		board[item.py][item.px] = 0;
+		rule50 = board[9 * item.ty + item.tx] ? 0 : rule50 + 1;
+		board[9 * item.ty + item.tx] = board[9 * item.py + item.px];
+		board[9 * item.py + item.px] = 0;
 		if (red_to_move) {
 			current_fullmove++;
 		}
@@ -633,8 +637,8 @@ const navigateToMove = (variation_id, idx, don_t_animate) => {
 			old_from_new[9 * item.py + item.px] = old_from_new[old];
 			old_from_new[old] = -1;
 		}
-		board[item.py][item.px] = board[item.ty][item.tx];
-		board[item.ty][item.tx] = item.captured;
+		board[9 * item.py + item.px] = board[9 * item.ty + item.tx];
+		board[9 * item.ty + item.tx] = item.captured;
 		rule50 = item.rule50_before;
 		if (!red_to_move) {
 			current_fullmove--;
@@ -908,7 +912,7 @@ const drawLegals = () => {
 			|| active_y === undefined) {
 		return;
 	}
-	const piece = board[active_y][active_x];
+	const piece = board[9 * active_y + active_x];
 	for (let off_y = -1; off_y <= 1; off_y++) {
 		const y = active_y + off_y;
 		if (y < 0 || y > 8) {
@@ -922,7 +926,7 @@ const drawLegals = () => {
 			if (x < 0 || x > 8) {
 				continue;
 			}
-			const target_piece = board[y][x];
+			const target_piece = board[9 * y + x];
 			if (!couldTake(piece, target_piece)) {
 				continue;
 			}
@@ -999,14 +1003,15 @@ const fillAndPutMove = (px, py, tx, ty, move) => {
 	move.py = py;
 	move.tx = tx;
 	move.ty = ty;
-	if ((board[8][8] ^ 4) > 4) {
+	if ((board[80] ^ 4) > 4) {
 		adjudication = 1;
-	} else if (board[0][0] > 4) {
+	} else if (board[0] > 4) {
 		adjudication = -1;
-	} else if (!board.some((row, y) => row.some((cell, x) => {
+	} else if (!board.some((cell, i) => {
 			if ((cell - 1) >> 2 !== Number(red_to_move)) {
 				return false;
 			}
+			const y = Math.floor(i / 9), x = i % 9;
 			for (let uy = y - 1; uy <= y + 1; uy++) {
 				if (uy < 0 || uy > 8) {
 					continue;
@@ -1015,13 +1020,13 @@ const fillAndPutMove = (px, py, tx, ty, move) => {
 					if (ux < 0 || ux > 8 || (ux !== x && uy !== y)) {
 						continue;
 					}
-					if (couldTake(cell, board[uy][ux])) {
+					if (couldTake(cell, board[9 * uy + ux])) {
 						return true;
 					}
 				}
 			}
 			return false;
-		}))) {
+		})) {
 		// Stalemate.
 		adjudication = 2 * Number(red_to_move) - 1;
 	} else if (rule50 === 200) {
@@ -1079,14 +1084,14 @@ const movePiece = (px, py, tx, ty, from_drag) => {
 	if (px == tx && py == ty || Math.abs(tx - px) > 1 || Math.abs(ty - py) > 1) {
 		return;
 	}
-	const piece = board[py][px];
-	const target_piece = board[ty][tx];
+	const piece = board[9 * py + px];
+	const target_piece = board[9 * ty + tx];
 	if (!couldTake(piece, target_piece)) {
 		return;
 	}
 	const name = getAlgPieceName(px, py, tx, ty, board, piece);
-	board[py][px] = 0;
-	board[ty][tx] = piece;
+	board[9 * py + px] = 0;
+	board[9 * ty + tx] = piece;
 	red_to_move = !red_to_move;
 	current_fullmove += 1 - Number(red_to_move);
 	fillAndPutMove(px, py, tx, ty, {
@@ -1394,15 +1399,125 @@ document.addEventListener('mousedown', (e) => {
 });
 
 //#endregion
+//#region Saving/Loading
+
+const re_int = /^[+-]?[0-9]+$/;
+window.loadFen = (fen) => {
+	const tokens = fen.split(' ');
+	if (tokens.length < 2 || tokens.length > 4 || tokens[1].length !== 1) {
+		return;
+	}
+	const fen_rows = tokens[0].split('/');
+	if (fen_rows.length !== 9) {
+		return false;
+	}
+	const parsed_board = [];
+	for (const fen_row of fen_rows) {
+		const N = fen_row.length;
+		if (N > 9) {
+			return false;
+		}
+		const row = [];
+		let was_gap = false;
+		for (let i = 0; i < N; i++) {
+			const c = fen_row.charCodeAt(i);
+			if (49 <= c && c <= 57) {
+				if (was_gap) {
+					return false;
+				}
+				was_gap = true;
+				row.push(...[...Array(c - 48)].map(() => 0));
+				continue;
+			}
+			was_gap = false;
+			switch (c) {
+				default:
+					return false;
+				case 82:
+					row.push(BLUE|ROCK);
+					break;
+				case 80:
+					row.push(BLUE|PAPER);
+					break;
+				case 83:
+					row.push(BLUE|SCISSORS);
+					break;
+				case 114:
+					row.push(RED|ROCK);
+					break;
+				case 112:
+					row.push(RED|PAPER);
+					break;
+				case 115:
+					row.push(RED|SCISSORS);
+			}
+		}
+		if (row.length !== 9) {
+			return false;
+		}
+		parsed_board.push(row);
+	}
+	let parsed_red_to_move;
+	switch (tokens[1].charCodeAt(0)) {
+		default:
+			return false;
+		case 98:
+			parsed_red_to_move = false;
+			break;
+		case 114:
+			parsed_red_to_move = true;
+	}
+	let parsed_rule50 = 0;
+	let parsed_fullmove = 1;
+	if (tokens.length >= 3 && tokens[2].match(re_int)) {
+		const value = parseInt(tokens[2]);
+		if (0 <= value && value <= 200) {
+			parsed_rule50 = value;
+		}
+	}
+	if (tokens.length >= 4 && tokens[3].match(re_int)) {
+		const value = parseInt(tokens[3]);
+		if (0 <= value && value <= 1901) {
+			parsed_fullmove = value || 1;
+		}
+	}
+	move_history = JSON.parse(empty_move_tree);
+	current_variation_id = '0';
+	current_variation = move_history[current_variation_id];
+	current_history_idx = 0;
+	board = parsed_board;
+	red_to_move = parsed_red_to_move;
+	rule50 = parsed_rule50;
+	current_fullmove = parsed_fullmove;
+	move_history['0'][0].from_idx = 2 * (current_fullmove - 1) + Number(red_to_move);
+	printMoves();
+	navigateToMove('0', 0, true);
+	return true;
+};
+
+//#endregion
+//#region Importing
+
+// TODO: https://meaf.us/rps/api/past_games
+
+/** @param {string} game_id */
+const loadMeafGame = (game_id) => {
+	// https://meaf.us/rps2/api/game_history
+};
+
+//#endregion
 //#region Accuracy
 
 const getWinChance = (cp) => {
-	if (Math.abs(cp) > 32000) {
+	if (Math.abs(cp) > Engine.EVAL_MAX) {
 		return Number(cp >= 0);
 	}
+	// Formula from Lichess.
+	// TODO: Magic constant 0.00368208 taken from chess; may not apply well here
 	return 0.5 + 0.5 * (2 / (1 + Math.exp(-0.00368208 * cp)) - 1);
 }
 const getMoveAccuracy = (win_before, win_after) => (
+	// Formula from Lichess.
 	1.031668 * Math.exp(-4.354 * (win_before - win_after)) - 0.031669
 );
 
@@ -1426,9 +1541,10 @@ const getEvalString = (cp) => {
 	}
 	return (cp > 0 ? '+' : cp === 0 ? '\xB1' : '\u2212')
 		+ (
-			// magic number i pulled out of my ass
-			Math.round(imbalance * (eval_in_pieces ? 1.861797350519155 : 1))
-				* (eval_in_pieces ? 0.001 : 0.01)
+			eval_in_pieces
+				// magic number i pulled out of my ass
+				? 0.001 * Math.round(1.861797350519155 * imbalance)
+				: 0.01 * imbalance
 		).toPrecision(eval_in_pieces ? 4 : 3).slice(0, eval_in_pieces ? 5 : 4)
 };
 const getNPSString = (nps) => {
@@ -1491,25 +1607,26 @@ const lineMoveBlur = (e) => {
 		.removeAttribute('focus');
 };
 const lineMoveMouseUp = (e) => {
-	const {[0]: line_no, [1]: idx}
-		= e.currentTarget.id.split(':').splice(1).map(Number);
-	const pv = current_variation[current_history_idx].eval.multipv[line_no].pv;
 	const variation_id_before = current_variation_id;
 	const variation_before = current_variation;
 	const history_idx_before = current_history_idx;
-	const board_before = JSON.parse(JSON.stringify(board));
 	const red_to_move_before = red_to_move;
 	const fullmove_before = current_fullmove;
+
+	const {[0]: line_no, [1]: idx}
+		= e.currentTarget.id.split(':').splice(1).map(Number);
+	const pv = current_variation[current_history_idx].eval.multipv[line_no].pv;
+	const board_clone = new Int8Array(board);
 	for (let i = 0; i <= idx; i++) {
 		const numeric = pv[i];
 		const px = numeric & 15;
 		const py = (numeric >> 4) & 15;
 		const tx = (numeric >> 8) & 15;
 		const ty = numeric >> 12;
-		const piece = board[py][px];
-		const target_piece = board[ty][tx];
-		const name = getAlgPieceName(px, py, tx, ty, board, piece);
-		board[ty][tx] = piece;
+		const piece = board_clone[9 * py + px];
+		const target_piece = board_clone[9 * ty + tx];
+		const name = getAlgPieceName(px, py, tx, ty, board_clone, piece);
+		board_clone[9 * ty + tx] = piece;
 		red_to_move = !red_to_move;
 		current_fullmove += 1 - Number(red_to_move);
 		fillAndPutMove(px, py, tx, ty, {
@@ -1521,10 +1638,10 @@ const lineMoveMouseUp = (e) => {
 	}
 	const variation_id_after = current_variation_id;
 	const history_idx_after = current_history_idx;
+
 	current_variation_id = variation_id_before;
 	current_variation = variation_before;
 	current_history_idx = history_idx_before;
-	board = board_before;
 	red_to_move = red_to_move_before;
 	current_fullmove = fullmove_before;
 	printMoves();
@@ -1542,7 +1659,7 @@ const printLine = (line, line_no) => {
 				+ '<path d="M 1 3 l 2 2 l 2 -2" />'
 			+ '</svg>'
 			+ `<h2>${getEvalString(line.score)}</h2>`;
-	const board_clone = JSON.parse(JSON.stringify(board));
+	const board_clone = new Int8Array(board);
 	const pv = line.pv;
 	let i = 0;
 	let fullmove_clone = current_fullmove;
@@ -1554,7 +1671,7 @@ const printLine = (line, line_no) => {
 		const py = (numeric >> 4) & 15;
 		const tx = (numeric >> 8) & 15;
 		const ty = numeric >> 12;
-		const piece = board_clone[py][px];
+		const piece = board_clone[9 * py + px];
 		line_html += `<button id="lmove:${line_no}:${i}" class="line-move">`
 				+ (
 					i !== 0 && !red_to_move_clone
@@ -1562,7 +1679,7 @@ const printLine = (line, line_no) => {
 						: ''
 				)
 				+ getAlgPieceName(px, py, tx, ty, board_clone, piece)
-				+ (board_clone[ty][tx] ? 'x' : '')
+				+ (board_clone[9 * ty + tx] ? 'x' : '')
 				+ getSquareName(tx, ty)
 			+ '</button>';
 		fullmove_clone += Number(red_to_move_clone);
@@ -1571,8 +1688,8 @@ const printLine = (line, line_no) => {
 		if (i >= pv.length) {
 			break;
 		}
-		board_clone[py][px] = 0;
-		board_clone[ty][tx] = piece;
+		board_clone[9 * py + px] = 0;
+		board_clone[9 * ty + tx] = piece;
 	}
 	clearEnginePreview();
 	line_element.innerHTML = line_html;
@@ -1619,15 +1736,16 @@ const clearLines = () => {
 
 const drawBestmoves = (multipv) => {
 	const optimum = getWinChance(multipv[0].score);
-	bestmove_element.innerHTML = multipv.map((v, i) => {
+	bestmove_element.innerHTML = multipv.slice(0, engine_lines).map((v, i) => {
 		if (!v.pv) {
-			return;
-		}
-		const numeric = v.pv[0];
-		const accuracy = getMoveAccuracy(optimum, getWinChance(v.score))
-		if (accuracy < 0.5) {
 			return '';
 		}
+		const numeric = v.pv[0];
+		const win_chance = getWinChance(v.score);
+		if (optimum - win_chance >= 0.15) {
+			return '';
+		}
+		const accuracy = getMoveAccuracy(optimum, win_chance);
 		return arrowPoint(
 			(numeric & 15),
 			8 - ((numeric >> 4) & 15),
@@ -1713,12 +1831,15 @@ let eval_in_pieces = inPiecesFrom(getOption('units'));
 document.getElementById('units').addEventListener('change', (e) => {
 	const value = e.currentTarget.value;
 	eval_in_pieces = inPiecesFrom(value);
-	printEval(current_variation[current_history_idx].eval ?? {
-		depth: 0,
-		nodes: 0,
-		nps: 0,
-		multipv: [{score: 0, pv: null}],
-	});
+	printEval(
+		current_variation[current_history_idx].eval
+			?? JSON.parse('{\
+				"depth": 0,\
+				"nodes": 0,\
+				"nps": 0,\
+				"multipv": [{"score": 0, "pv": null}],\
+			}')
+	);
 	setOption('units', value);
 });
 
@@ -2011,7 +2132,7 @@ Engine.onEvalFinished = (depth) => {
 	eval_speed_element.innerHTML = 'Finished';
 };
 clearLines();
-Engine.sendPosition(getFen(), current_variation[current_history_idx]);
+await Engine.sendPosition(getFen(), current_variation[current_history_idx]);
 engine_loaded = true;
 
 //#endregion
