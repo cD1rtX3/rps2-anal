@@ -1627,6 +1627,7 @@ const lineMoveMouseUp = (e) => {
 		const target_piece = board_clone[9 * ty + tx];
 		const name = getAlgPieceName(px, py, tx, ty, board_clone, piece);
 		board_clone[9 * ty + tx] = piece;
+		board_clone[9 * py + px] = 0;
 		red_to_move = !red_to_move;
 		current_fullmove += 1 - Number(red_to_move);
 		fillAndPutMove(px, py, tx, ty, {
