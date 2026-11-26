@@ -305,17 +305,19 @@ export default class Engine {
 			Engine.#eval.multipv[line_no] = {score: 0, pv: null};
 		}
 		let updated = false;
-		if (info.depth !== undefined && Engine.#eval.depth !== info.depth) {
-			updated = true;
-			Engine.#eval.depth = info.depth;
-		}
-		if (info.nodes !== undefined && Engine.#eval.nodes !== info.nodes) {
-			updated = true;
-			Engine.#eval.nodes = info.nodes;
-		}
-		if (info.nps !== undefined && Engine.#eval.nps !== info.nps) {
-			updated = true;
-			Engine.#eval.nps = info.nps;
+		if (line_no === 0) {
+			if (info.depth !== undefined && Engine.#eval.depth !== info.depth) {
+				updated = true;
+				Engine.#eval.depth = info.depth;
+			}
+			if (info.nodes !== undefined && Engine.#eval.nodes !== info.nodes) {
+				updated = true;
+				Engine.#eval.nodes = info.nodes;
+			}
+			if (info.nps !== undefined && Engine.#eval.nps !== info.nps) {
+				updated = true;
+				Engine.#eval.nps = info.nps;
+			}
 		}
 		if (info.score !== undefined) {
 			updated = true;
